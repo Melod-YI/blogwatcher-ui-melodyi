@@ -622,6 +622,12 @@ func (db *Database) GetBlogByID(id int64) (*model.Blog, error) {
 	return scanBlog(row)
 }
 
+// GetArticleByID returns an article by its ID, or nil if not found.
+func (db *Database) GetArticleByID(id int64) (*model.Article, error) {
+	row := db.conn.QueryRow(`SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note FROM articles WHERE id = ?`, id)
+	return scanArticle(row)
+}
+
 // GetBlogByURL returns a blog by its URL, or nil if not found.
 func (db *Database) GetBlogByURL(url string) (*model.Blog, error) {
 	row := db.conn.QueryRow(`SELECT id, name, url, feed_url, scrape_selector, last_scanned FROM blogs WHERE url = ?`, url)
