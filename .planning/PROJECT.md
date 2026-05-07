@@ -8,17 +8,16 @@ A web-based reader UI for the existing blogwatcher CLI tool. It provides an Omni
 
 Read and manage blog articles through a clean, responsive web interface without touching the CLI.
 
-## Current Milestone: v1.2 Blog Management
+## Current Milestone: v1.3 CLI System (COMPLETE)
 
-**Goal:** Manage blogs entirely from the web UI — add, edit, remove — without touching the CLI.
+**Goal:** 提供独立的 CLI 工具，可通过 `go install` 安装，完成扫描、列出文章、标记已读/未读等核心操作。
 
-**Target features:**
-- Add new blogs by URL (auto-discover RSS/Atom feed via CLI)
-- Auto-sync new blog after adding (using UI's sync with thumbnails)
-- Edit blog settings (name, URL, feed URL)
-- Remove blogs with confirmation (choice to keep or delete articles)
-- Settings page for blog management
-- RSS/Atom feeds only (no scrape support this milestone)
+**Shipped features:**
+- CLI 统一入口点 (cmd/blogwatcher/main.go)
+- serve 子命令启动 UI 服务器
+- blog scan 命令扫描所有/指定博客
+- article list 命令支持多筛选和多格式输出
+- article mark-read/mark-unread 命令
 
 ## Requirements
 
@@ -60,15 +59,35 @@ Shipped in v1.1:
 - ✓ **SRCH-06**: Combined filters (blog + status + search + date together) — v1.1
 - ✓ **SRCH-07**: Display results count showing how many articles match — v1.1
 
+Shipped in v1.2:
+
+- ✓ **SETT-01**: Settings page displays blog list — v1.2
+- ✓ **SETT-02**: Blog list shows article counts — v1.2
+- ✓ **SETT-03**: Settings page accessible from sidebar — v1.2
+- ✓ **ADD-01**: Add blog by URL with auto feed discovery — v1.2
+- ✓ **ADD-02**: Auto-sync new blog after adding — v1.2
+- ✓ **ADD-03**: New blog appears in sidebar immediately — v1.2
+- ✓ **ADD-04**: FAB for quick blog addition — v1.2
+- ✓ **ADD-05**: Add blog form validates URL — v1.2
+- ✓ **ADD-06**: Error feedback for invalid URLs — v1.2
+- ✓ **EDIT-01**: Edit blog name inline — v1.2
+- ✓ **REM-01**: Remove blog with confirmation dialog — v1.2
+- ✓ **REM-02**: Confirmation shows article count — v1.2
+- ✓ **REM-03**: Cascade delete blog + articles — v1.2
+
+Shipped in v1.3:
+
+- ✓ **CLI-01**: blog scan 命令扫描所有博客 — v1.3
+- ✓ **CLI-02**: article list 命令支持多筛选 — v1.3
+- ✓ **CLI-03**: article mark-read 命令 — v1.3
+- ✓ **CLI-04**: article mark-unread 命令 — v1.3
+- ✓ **CLI-05**: 全局 --db flag — v1.3
+- ✓ **CLI-06**: go install 安装 — v1.3
+- ✓ **CLI-07**: serve 子命令启动 UI — v1.3
+
 ### Active
 
-v1.2 scope:
-
-- [ ] Add new blogs by URL with auto feed discovery
-- [ ] Auto-sync new blog after adding
-- [ ] Edit blog settings (name, URL, feed URL)
-- [ ] Remove blogs with confirmation dialog
-- [ ] Settings page for blog management
+(Next milestone TBD)
 
 ### Out of Scope
 
@@ -113,7 +132,11 @@ v1.2 scope:
 | Manual sync only | Keeps it simple, user controls when to refresh | ✓ Good |
 | Three-way theme toggle | Light/Dark/System with CSS :has() and localStorage | ✓ Good |
 
-| Shell exec for CLI integration | Leverage existing blogwatcher CLI for feed discovery, keep logic centralized | — Pending |
+| Shell exec for CLI integration | Leverage existing blogwatcher CLI for feed discovery, keep logic centralized | ✓ Good (v1.2) |
+
+| Cobra framework for CLI | Standard Go CLI framework, persistent flags, subcommand nesting | ✓ Good (v1.3) |
+| Unified entry point (cmd/blogwatcher) | Single binary for UI and CLI, go install compatible | ✓ Good (v1.3) |
+| Output formatters as package | Separate internal/cli/output for table/json/simple formats | ✓ Good (v1.3) |
 
 ---
-*Last updated: 2026-02-08 after v1.2 milestone start*
+*Last updated: 2026-05-07 after v1.3 milestone*
