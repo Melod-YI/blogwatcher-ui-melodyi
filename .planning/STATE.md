@@ -1,3 +1,20 @@
+---
+gsd_state_version: 1.0
+milestone: v1.2
+milestone_name: Blog Management
+current_phase: Phase 11 - Edit and Remove Blogs (COMPLETE)
+status: executing
+stopped_at: v1.2 milestone complete
+last_updated: "2026-05-07T08:00:15.028Z"
+last_activity: 2026-05-07
+progress:
+  total_phases: 4
+  completed_phases: 2
+  total_plans: 9
+  completed_plans: 5
+  percent: 56
+---
+
 # Project State: BlogWatcher UI
 
 **Last updated:** 2026-02-09
@@ -26,14 +43,15 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 **Milestone:** v1.2 (Blog Management) - Complete
 **Phase:** Phase 11 - Edit and Remove Blogs (COMPLETE)
 **Plan:** 11-03 complete (human verified)
-**Status:** v1.2 milestone complete
-**Last activity:** 2026-02-09 — Phase 11 complete (inline edit, delete with confirmation)
+**Status:** Ready to execute
+**Last activity:** 2026-05-07
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 21 (10 from v1.0 + 5 from v1.1 + 6 from v1.2)
 - Average duration: ~3-5 min per plan
 - Total execution time: (tracked during execution)
@@ -84,6 +102,7 @@ None.
 ### Known Blockers/Concerns
 
 **v1.2 dependencies:**
+
 - blogwatcher CLI must be installed and in PATH for shell exec
 - CLI `add` command handles feed auto-discovery
 - Phase 10 requires os/exec integration to call CLI commands
@@ -94,18 +113,22 @@ None.
 **Database location:** `~/.blogwatcher/blogwatcher.db`
 
 **Schema (v1.0):**
+
 - `blogs` table: id, name, url, feed_url, scrape_selector, last_scanned
 - `articles` table: id, blog_id, title, url, published_date, discovered_date, is_read
 
 **Schema changes (v1.1):**
+
 - [DONE] `articles` table: thumbnail_url column (nullable TEXT)
 - [DONE] FTS5 virtual table `articles_fts` for title search
 - [DONE] Sync triggers: articles_ai, articles_au, articles_ad
 
 **Schema changes (v1.2):**
+
 - [DONE] `articles.blog_id` made nullable (for future orphan article support)
 
 **New in v1.2:**
+
 - [DONE] ListBlogsWithCounts() method with LEFT JOIN + GROUP BY
 - [DONE] BlogWithCount struct embedding model.Blog with ArticleCount
 - [DONE] GetBlogByID(), UpdateBlogName(), GetArticleCountForBlog() methods
@@ -114,6 +137,7 @@ None.
 **Tech stack:** Go server, Go templates, HTMX 2.0.4, SQLite (modernc.org/sqlite), CSS custom properties, gofeed, goquery
 
 **Dependencies:**
+
 - github.com/otiai10/opengraph/v2 (Open Graph image extraction)
 
 ## Session History
