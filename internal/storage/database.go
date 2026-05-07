@@ -1052,3 +1052,77 @@ func (db *Database) UpdateArticleThumbnail(id int64, thumbnailURL string) error 
 	_, err := db.conn.Exec(`UPDATE articles SET thumbnail_url = ? WHERE id = ?`, nullIfEmpty(thumbnailURL), id)
 	return err
 }
+
+// ListFilterOptions 筛选文章的选项参数
+// 用于 CLI article list 命令，支持按博客名称、已读状态、日期筛选
+type ListFilterOptions struct {
+	BlogName  string     // 博客名称筛选（空表示所有博客）
+	IsRead    *bool      // 已读状态筛选（nil 表示所有状态）
+	AfterDate *time.Time // 日期筛选（nil 表示无限制）
+	Limit     int        // 结果数量限制（0 表示无限制）
+}
+
+// ListArticlesWithFilters 根据筛选选项列出文章（带博客信息）
+// 支持按博客名称、已读状态、日期筛选，用于 CLI article list 命令
+func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.ArticleWithBlog, error) {
+	// 构建基础查询
+	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, b.name, b.url
+		FROM articles a
+		INNER JOIN blogs b ON a.blog_id = b.id
+		WHERE 1=1`
+
+	var conditions []string
+	var args []interface{}
+
+	// 博客名称筛选（通过子查询获取 blog_id）
+	if opts.BlogName != "" {
+		conditions = append(conditions, "a.blog_id = (SELECT id FROM blogs WHERE name = ?)")
+		args = append(args, opts.BlogName)
+	}
+
+	// 已读状态筛选
+	if opts.IsRead != nil {
+		conditions = append(conditions, "a.is_read = ?")
+		args = append(args, *opts.IsRead)
+	}
+
+	// 日期筛选（使用 published_date 或 discovered_date）
+	if opts.AfterDate != nil {
+		conditions = append(conditions, "COALESCE(a.published_date, a.discovered_date) >= ?")
+		args = append(args, opts.AfterDate.Format("2006-01-02"))
+	}
+
+	// 添加 WHERE 条件
+	if len(conditions) > 0 {
+		query += " AND " + strings.Join(conditions, " AND ")
+	}
+
+	// 排序：按发布日期或发现日期降序
+	query += " ORDER BY COALESCE(a.published_date, a.discovered_date) DESC"
+
+	// 结果数量限制
+	if opts.Limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", opts.Limit)
+	}
+
+	// 执行查询
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// 扫描结果
+	var articles []model.ArticleWithBlog
+	for rows.Next() {
+		article, err := scanArticleWithBlog(rows)
+		if err != nil {
+			return nil, err
+		}
+		if article != nil {
+			articles = append(articles, *article)
+		}
+	}
+
+	return articles, rows.Err()
+}
