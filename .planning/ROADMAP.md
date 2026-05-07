@@ -362,12 +362,12 @@ Plans:
 
 **Depends on:** Phase 4 (Article Management - scanner package)
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 12-01-PLAN.md — CLI framework setup (cobra root, global flags, serve command)
-- [ ] 12-02-PLAN.md — Blog commands (scan all, scan specific)
-- [ ] 12-03-PLAN.md — Article commands (list, mark-read, mark-unread)
+- [x] 12-01-PLAN.md — CLI framework setup (cobra root, global flags, serve command)
+- [x] 12-02-PLAN.md — Blog commands (scan all, scan specific)
+- [x] 12-03-PLAN.md — Article commands (list, mark-read, mark-unread)
 
 ---
 
