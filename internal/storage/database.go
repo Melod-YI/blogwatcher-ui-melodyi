@@ -378,7 +378,7 @@ func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
 }
 
 func (db *Database) ListArticles(unreadOnly bool, blogID *int64) ([]model.Article, error) {
-	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read FROM articles WHERE 1=1`
+	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note FROM articles WHERE 1=1`
 	var args []interface{}
 	if unreadOnly {
 		query += " AND is_read = 0"
@@ -412,7 +412,7 @@ func (db *Database) ListArticles(unreadOnly bool, blogID *int64) ([]model.Articl
 // isRead=true returns read articles, isRead=false returns unread articles.
 // blogID filters to a specific blog if provided.
 func (db *Database) ListArticlesByReadStatus(isRead bool, blogID *int64) ([]model.Article, error) {
-	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read FROM articles WHERE is_read = ?`
+	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note FROM articles WHERE is_read = ?`
 	args := []interface{}{isRead}
 
 	if blogID != nil {
@@ -444,7 +444,7 @@ func (db *Database) ListArticlesByReadStatus(isRead bool, blogID *int64) ([]mode
 // Uses INNER JOIN to fetch blog info alongside article data.
 // isRead filters by read status, blogID optionally filters to a specific blog.
 func (db *Database) ListArticlesWithBlog(isRead bool, blogID *int64) ([]model.ArticleWithBlog, error) {
-	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, b.name, b.url
+	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id
 		WHERE a.is_read = ?`
@@ -481,7 +481,7 @@ func (db *Database) ListArticlesWithBlog(isRead bool, blogID *int64) ([]model.Ar
 func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWithBlog, int, error) {
 	// Build base query - conditionally add FTS5 JOIN only when searching
 	var query strings.Builder
-	query.WriteString(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, b.name, b.url, COUNT(*) OVER() as total_count
+	query.WriteString(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url, COUNT(*) OVER() as total_count
 		FROM articles a`)
 
 	var conditions []string
@@ -861,8 +861,9 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 		publishedDate sql.NullString
 		discovered    sql.NullString
 		isRead        bool
+		hasNote       bool
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -876,6 +877,7 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 		URL:          url,
 		ThumbnailURL: thumbnailURL.String,
 		IsRead:       isRead,
+		HasNote:      hasNote,
 	}
 	if publishedDate.Valid {
 		if parsed, err := parseTime(publishedDate.String); err == nil {
@@ -903,8 +905,9 @@ func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.A
 		isRead        bool
 		blogName      string
 		blogURL       string
+		hasNote       bool
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &blogName, &blogURL); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &blogName, &blogURL, &hasNote); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -920,6 +923,7 @@ func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.A
 		IsRead:       isRead,
 		BlogName:     blogName,
 		BlogURL:      blogURL,
+		HasNote:      hasNote,
 	}
 	if publishedDate.Valid {
 		if parsed, err := parseTime(publishedDate.String); err == nil {
@@ -945,11 +949,12 @@ func scanArticleWithBlogAndCount(scanner interface{ Scan(dest ...any) error }) (
 		publishedDate sql.NullString
 		discovered    sql.NullString
 		isRead        bool
+		hasNote       bool
 		blogName      string
 		blogURL       string
 		totalCount    int
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &blogName, &blogURL, &totalCount); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &blogName, &blogURL, &totalCount); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, nil
 		}
@@ -963,6 +968,7 @@ func scanArticleWithBlogAndCount(scanner interface{ Scan(dest ...any) error }) (
 		URL:          url,
 		ThumbnailURL: thumbnailURL.String,
 		IsRead:       isRead,
+		HasNote:      hasNote,
 		BlogName:     blogName,
 		BlogURL:      blogURL,
 	}
@@ -1066,7 +1072,7 @@ type ListFilterOptions struct {
 // 支持按博客名称、已读状态、日期筛选，用于 CLI article list 命令
 func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.ArticleWithBlog, error) {
 	// 构建基础查询
-	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, b.name, b.url
+	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id
 		WHERE 1=1`
