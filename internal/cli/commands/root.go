@@ -32,6 +32,8 @@ func init() {
 	rootCmd.AddCommand(NewServeCmd())
 	// 添加 blog 子命令
 	rootCmd.AddCommand(NewBlogCmd())
+	// 添加 article 子命令
+	rootCmd.AddCommand(NewArticleCmd())
 }
 
 // Execute 执行根命令
