@@ -328,7 +328,7 @@ query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_d
 
 **具体修改（database.go scanArticleWithBlogAndCount 函数）：**
 
-1. **变量声明（totalCount 之后添加）：**
+1. **变量声明（isRead 之后添加）：**
 ```go
 var (
     id            int64
@@ -339,19 +339,25 @@ var (
     publishedDate sql.NullString
     discovered    sql.NullString
     isRead        bool
+    hasNote       bool  // 新增（位于 isRead 之后）
     blogName      string
     blogURL       string
     totalCount    int
-    hasNote       bool  // 新增
 )
 ```
 
-2. **Scan 参数（&totalCount 之后添加）：**
+2. **Scan 参数（&isRead 之后添加，与 SearchArticles SELECT 字段顺序一致）：**
 ```go
-if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &blogName, &blogURL, &totalCount, &hasNote); err != nil {
+if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &blogName, &blogURL, &totalCount); err != nil {
 ```
 
-3. **字段赋值（BlogURL 之后添加）：**
+**Scan 参数顺序必须匹配 SearchArticles SELECT 字段顺序：**
+```
+a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url, COUNT(*) OVER() as total_count
+  1     2        3       4          5                   6                  7               8           9         10      11            12
+```
+
+3. **字段赋值（IsRead 之后添加）：**
 ```go
 article := &model.ArticleWithBlog{
     ID:           id,
@@ -360,25 +366,24 @@ article := &model.ArticleWithBlog{
     URL:          url,
     ThumbnailURL: thumbnailURL.String,
     IsRead:       isRead,
+    HasNote:      hasNote,  // 新增
     BlogName:     blogName,
     BlogURL:      blogURL,
-    HasNote:      hasNote,  // 新增
 }
 ```
 
-**重要：SearchArticles SELECT 字段顺序需确保 has_note 在 total_count 之前。**
-
-Task 3 已更新 SearchArticles SELECT，字段顺序为：
+**重要：SearchArticles SELECT 字段顺序（Task 3 已更新）：**
 ```go
 a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url, COUNT(*) OVER() as total_count
 ```
+对应 Scan 参数：&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &blogName, &blogURL, &totalCount
 </action>
   <verify>
     <automated>go build ./internal/storage/</automated>
   </verify>
   <acceptance_criteria>
     - scanArticleWithBlogAndCount 函数包含 `hasNote bool` 变量声明
-    - scanner.Scan 参数包含 `&hasNote`（位于 &totalCount 之后，共 12 个参数）
+    - scanner.Scan 参数包含 `&hasNote`（位于 &isRead 之后、&blogName 之前，共 12 个参数）
     - article 结构体赋值包含 `HasNote: hasNote`
     - go build ./internal/storage/ 成功
   </acceptance_criteria>
