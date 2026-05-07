@@ -2,7 +2,7 @@
 
 **Created:** 2026-02-02
 **Depth:** standard
-**Total Phases:** 12
+**Total Phases:** 15
 
 ## Milestones
 
@@ -10,6 +10,7 @@
 - ✅ **v1.1 UI Polish & Search** - Phases 6-8 (shipped 2026-02-03)
 - ✅ **v1.2 Blog Management** - Phases 9-11 (shipped 2026-02-09)
 - ✅ **v1.3 CLI System** - Phase 12 (shipped 2026-05-07)
+- 🔄 **v1.4 Article Notes** - Phases 13-15 (planning)
 
 ## Phases
 
@@ -374,6 +375,83 @@ Plans:
 
 ---
 
+## v1.4 Article Notes (PLANNING)
+
+**Milestone Goal:** 允许用户为文章编写备注，备注为 Markdown 文档，可在 UI 查看。
+**Started:** 2026-05-07
+
+### Phase 13: CLI Notes Infrastructure
+
+**Goal:** 用户可以通过 CLI 写入和删除文章备注，备注以 Markdown 文件存储。
+
+**Requirements:**
+- NOTE-01: CLI `note --article-id <id> --file <path>` 写入备注
+- NOTE-02: CLI `note delete --article-id <id>` 删除备注
+- NOTE-03: 缺少必填参数时报错退出
+- NOTE-06: 备注存储于 ~/.blogwatcher/notes/{article_id}.md
+- NOTE-07: articles 表新增 has_note 字段
+- NOTE-08: 写入/删除备注时同步更新 has_note 字段
+
+**Success Criteria:**
+1. 用户执行 `blogwatcher note --article-id 42 --file ~/note.md` 成功写入备注
+2. 源文件内容被完整复制（不依赖源文件后续变化）
+3. 用户执行 `blogwatcher note delete --article-id 42` 成功删除备注
+4. 缺少 --article-id 或 --file 时输出错误消息并退出
+5. 备注 文件存储于 ~/.blogwatcher/notes/ 目录
+6. articles 表新增 has_note BOOLEAN 字段
+7. 写入备注后 article.has_note = TRUE
+8. 删除备注后 article.has_note = FALSE
+
+**Depends on:** Phase 12 (CLI Foundation)
+
+**Plans:** 0 plans (not yet created)
+
+---
+
+### Phase 14: CLI Filtering Enhancement
+
+**Goal:** 用户可以通过 --not-noted 参数筛选无备注文章，可与 --unread 组合使用。
+
+**Requirements:**
+- NOTE-04: CLI `article list --not-noted` 筛选无备注文章
+- NOTE-05: --not-noted 可与 --unread 组合使用
+
+**Success Criteria:**
+1. 用户执行 `blogwatcher article list --not-noted` 仅显示无备注文章
+2. 用户执行 `blogwatcher article list --not-noted --unread` 仅显示未读且无备注文章
+3. --not-noted 与 --blog、--after 等参数可组合使用
+4. 输出格式 (--format) 与 --not-noted 兼容
+
+**Depends on:** Phase 13 (CLI Notes Infrastructure)
+
+**Plans:** 0 plans (not yet created)
+
+---
+
+### Phase 15: UI Note Display
+
+**Goal:** 用户可以在 UI 上查看文章备注，Markdown 渲染显示。
+
+**Requirements:**
+- NOTE-09: 有备注的文章卡片显示备注按钮
+- NOTE-10: 点击备注按钮新标签页打开 Markdown 渲染页面
+- NOTE-11: Markdown 渲染支持 GFM 格式
+- NOTE-12: 备注 页面显示文章标题和原文链接
+
+**Success Criteria:**
+1. 文章卡片查询包含 has_note 字段
+2. has_note = TRUE 的文章卡片显示备注按钮（图标或标签）
+3. 点击备注按钮在新标签页打开 /note/{id} 页面
+4. 页面渲染 Markdown 内容（GFM 格式：表格、删除线、任务列表）
+5. 页面顶部显示文章标题和原文链接
+6. Markdown 样式与应用整体风格一致
+
+**Depends on:** Phase 14 (CLI Filtering Enhancement)
+
+**Plans:** 0 plans (not yet created)
+
+---
+
 ## Coverage Validation
 
 ### v1.0 Requirements
@@ -454,6 +532,25 @@ Plans:
 
 **v1.3 Coverage:** 7/7 requirements mapped (100%)
 
+### v1.4 Requirements
+
+| Requirement | Phase | Covered |
+|-------------|-------|---------|
+| NOTE-01 | 13 | Yes |
+| NOTE-02 | 13 | Yes |
+| NOTE-03 | 13 | Yes |
+| NOTE-04 | 14 | Yes |
+| NOTE-05 | 14 | Yes |
+| NOTE-06 | 13 | Yes |
+| NOTE-07 | 13 | Yes |
+| NOTE-08 | 13 | Yes |
+| NOTE-09 | 15 | Yes |
+| NOTE-10 | 15 | Yes |
+| NOTE-11 | 15 | Yes |
+| NOTE-12 | 15 | Yes |
+
+**v1.4 Coverage:** 12/12 requirements mapped (100%)
+
 ---
 
 ## Phase Progress
@@ -484,17 +581,26 @@ Plans:
 | 10 - Add Blog Flow | Complete | 100% |
 | 11 - Edit and Remove Blogs | Complete | 100% |
 
-### v1.3 (Planning)
+### v1.3 (Complete)
 
 | Phase | Status | Progress |
 |-------|--------|----------|
-| 12 - CLI Foundation | Planned | 0% |
+| 12 - CLI Foundation | Complete | 100% |
+
+### v1.4 (Planning)
+
+| Phase | Status | Progress |
+|-------|--------|----------|
+| 13 - CLI Notes Infrastructure | Planned | 0% |
+| 14 - CLI Filtering Enhancement | Planned | 0% |
+| 15 - UI Note Display | Planned | 0% |
 
 **v1.0 Progress:** 5/5 phases complete (100%)
 **v1.1 Progress:** 3/3 phases complete (100%)
 **v1.2 Progress:** 3/3 phases complete (100%)
-**v1.3 Progress:** 0/1 phases complete (0%)
-**Overall Progress:** 11/12 phases complete (92%)
+**v1.3 Progress:** 1/1 phases complete (100%)
+**v1.4 Progress:** 0/3 phases complete (0%)
+**Overall Progress:** 12/15 phases complete (80%)
 
 ---
 
@@ -517,4 +623,5 @@ Plans:
 *v1.2 COMPLETE: 2026-02-09*
 *v1.3 roadmap added: 2026-05-07*
 *Phase 12 planned: 2026-05-07*
+*v1.4 roadmap added: 2026-05-07*
 *Last updated: 2026-05-07*
