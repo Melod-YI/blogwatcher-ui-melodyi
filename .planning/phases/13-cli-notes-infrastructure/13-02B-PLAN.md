@@ -1,11 +1,11 @@
 ---
 phase: 13-cli-notes-infrastructure
-plan: 02
+plan: 02B
 type: execute
-wave: 1
-depends_on: []
+wave: 2
+depends_on:
+  - 13-02A
 files_modified:
-  - internal/model/model.go
   - internal/storage/database.go
 autonomous: true
 requirements:
@@ -14,28 +14,19 @@ user_setup: []
 
 must_haves:
   truths:
-    - "Article 结构体包含 HasNote bool 字段"
-    - "ArticleWithBlog 结构体包含 HasNote bool 字段"
     - "scanArticle 扫描 has_note 字段"
     - "scanArticleWithBlog 扫描 has_note 字段"
+    - "scanArticleWithBlogAndCount 扫描 has_note 字段"
     - "所有 Article 查询 SELECT 语句包含 has_note 字段"
   artifacts:
-    - path: "internal/model/model.go"
-      provides: "Article and ArticleWithBlog models with HasNote field"
-      contains:
-        - "HasNote bool"
-      min_lines: 50
     - path: "internal/storage/database.go"
       provides: "scanArticle and scanArticleWithBlog with has_note scanning"
       contains:
         - "hasNote bool"
         - "&hasNote"
+        - "SELECT.*has_note.*FROM articles"
       min_lines: 1200
   key_links:
-    - from: "model.Article"
-      to: "articles.has_note"
-      via: "HasNote field"
-      pattern: "HasNote bool"
     - from: "scanArticle"
       to: "model.Article"
       via: "Scan(&hasNote)"
@@ -47,10 +38,10 @@ must_haves:
 ---
 
 <objective>
-更新 Article 和 ArticleWithBlog 模型，添加 HasNote 字段，更新所有 scan 函数和 SELECT 查询。
+更新所有 scan 函数和 SELECT 查询，添加 has_note 字段支持。
 
-Purpose: 确保数据模型和查询函数支持 has_note 字段，为 CLI 和 UI 提供完整的数据访问。
-Output: model.go 添加 HasNote 字段，database.go 更新所有 scanArticle 函数和相关查询。
+Purpose: 确保数据库查询和扫描函数支持 has_note 字段（per D-07）。
+Output: database.go 更新 scanArticle、scanArticleWithBlog、scanArticleWithBlogAndCount 和所有 SELECT 查询。
 </objective>
 
 <execution_context>
@@ -64,39 +55,14 @@ Output: model.go 添加 HasNote 字段，database.go 更新所有 scanArticle �
 @.planning/STATE.md
 @.planning/phases/13-cli-notes-infrastructure/13-CONTEXT.md
 @.planning/phases/13-cli-notes-infrastructure/13-PATTERNS.md
+@.planning/phases/13-cli-notes-infrastructure/13-02A-SUMMARY.md
 
 <interfaces>
-<!-- 从 model.go 和 database.go 提取的关键接口 -->
+<!-- 从 database.go 和 model.go 提取的关键接口 -->
 
-现有 Article 结构体 (model.go:16-25):
-```go
-type Article struct {
-    ID             int64
-    BlogID         int64
-    Title          string
-    URL            string
-    ThumbnailURL   string
-    PublishedDate  *time.Time
-    DiscoveredDate *time.Time
-    IsRead         bool
-}
-```
-
-现有 ArticleWithBlog 结构体 (model.go:29-40):
-```go
-type ArticleWithBlog struct {
-    ID             int64
-    BlogID         int64
-    Title          string
-    URL            string
-    ThumbnailURL   string
-    PublishedDate  *time.Time
-    DiscoveredDate *time.Time
-    IsRead         bool
-    BlogName       string
-    BlogURL        string
-}
-```
+Plan 13-02A 已完成的模型更新：
+- Article.HasNote bool 字段已添加
+- ArticleWithBlog.HasNote bool 字段已添加
 
 现有 scanArticle 函数 (database.go:854-892):
 ```go
@@ -121,120 +87,27 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 }
 ```
 
-现有 scanArticleWithBlog 函数 (database.go:894-936):
-```go
-func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.ArticleWithBlog, error) {
-    var (
-        id            int64
-        blogID        int64
-        title         string
-        url           string
-        thumbnailURL  sql.NullString
-        publishedDate sql.NullString
-        discovered    sql.NullString
-        isRead        bool
-        blogName      string
-        blogURL       string
-    )
-    if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &blogName, &blogURL); err != nil {
-        // ... 错误处理 ...
-    }
-    // ... 字段赋值 ...
-}
-```
-
-需要更新的 SELECT 查询（在 database.go 中）：
-- ListArticles (line 381)
-- ListArticlesByReadStatus (line 415)
-- ListArticlesWithBlog (line 447)
-- SearchArticles (line 484)
-- ListArticlesWithFilters (line 1069)
+需要更新的 SELECT 查询：
+- ListArticles (约第 381 行)
+- ListArticlesByReadStatus (约第 415 行)
+- ListArticlesWithBlog (约第 447 行)
+- SearchArticles (约第 484 行)
+- ListArticlesWithFilters (约第 1069 行)
 </interfaces>
 </context>
 
 <tasks>
 
 <task type="auto" tdd="true">
-  <name>Task 1: 更新 Article 和 ArticleWithBlog 结构体</name>
-  <files>internal/model/model.go</files>
-  <read_first>
-    - internal/model/model.go (查看 Article 和 ArticleWithBlog 结构体定义)
-    - .planning/phases/13-cli-notes-infrastructure/13-PATTERNS.md (参考结构体扩展模式)
-  </read_first>
-  <behavior>
-    - Test 1: Article 结构体包含 `HasNote bool` 字段
-    - Test 2: ArticleWithBlog 结构体包含 `HasNote bool` 字段
-    - Test 3: 字段位于 IsRead 之后（保持字段顺序一致）
-    - Test 4: go build ./internal/model/ 成功
-  </behavior>
-  <action>
-在 model.go 中为 Article 和 ArticleWithBlog 结构体添加 HasNote bool 字段。
-
-**具体修改：**
-
-1. **Article 结构体（model.go 第 24 行，IsRead 之后添加）：**
-```go
-type Article struct {
-    ID             int64
-    BlogID         int64
-    Title          string
-    URL            string
-    ThumbnailURL   string
-    PublishedDate  *time.Time
-    DiscoveredDate *time.Time
-    IsRead         bool
-    HasNote        bool  // 新增：文章备注状态
-}
-```
-
-2. **ArticleWithBlog 结构体（model.go 第 37 行，IsRead 之后添加）：**
-```go
-type ArticleWithBlog struct {
-    ID             int64
-    BlogID         int64
-    Title          string
-    URL            string
-    ThumbnailURL   string
-    PublishedDate  *time.Time
-    DiscoveredDate *time.Time
-    IsRead         bool
-    BlogName       string
-    BlogURL        string
-    HasNote        bool  // 新增：文章备注状态
-}
-```
-
-**字段位置说明：**
-- Article 结构体：HasNote 位于 IsRead 之后（第 24 行）
-- ArticleWithBlog 结构体：HasNote 位于 BlogURL 之后（第 40 行）
-- 字段顺序与 SELECT 查询字段顺序保持一致
-</action>
-  <verify>
-    <automated>go build ./internal/model/</automated>
-    <manual>grep -n "HasNote" internal/model/model.go</manual>
-  </verify>
-  <acceptance_criteria>
-    - model.go Article 结构体包含 `HasNote bool` 字段
-    - model.go ArticleWithBlog 结构体包含 `HasNote bool` 字段
-    - 字段位于 IsRead 之后（Article）和 BlogURL 之后（ArticleWithBlog）
-    - go build ./internal/model/ 成功
-  </acceptance_criteria>
-  <done>
-Article 和 ArticleWithBlog 结构体添加 HasNote 字段完成，编译通过。
-</done>
-</task>
-
-<task type="auto" tdd="true">
-  <name>Task 2: 更新 scanArticle 函数</name>
+  <name>Task 1: 更新 scanArticle 函数</name>
   <files>internal/storage/database.go</files>
   <read_first>
     - internal/storage/database.go (查看 scanArticle 函数定义，约第 854 行)
-    - internal/model/model.go (确认 Article.HasNote 字段存在)
-    - .planning/phases/13-cli-notes-infrastructure/13-PATTERNS.md (参考 Scan 方法更新模式)
+    - internal/model/model.go (确认 Article.HasNote 字段已由 13-02A 添加)
   </read_first>
   <behavior>
     - Test 1: scanArticle 包含 `hasNote bool` 变量声明
-    - Test 2: scanner.Scan 参数包含 `&hasNote`
+    - Test 2: scanner.Scan 参数包含 `&hasNote`（9个参数）
     - Test 3: 返回的 article.HasNote 值正确
     - Test 4: go build ./internal/storage/ 成功
   </behavior>
@@ -243,7 +116,7 @@ Article 和 ArticleWithBlog 结构体添加 HasNote 字段完成，编译通过�
 
 **具体修改（database.go scanArticle 函数）：**
 
-1. **变量声明（约第 864 行，isRead 之后添加）：**
+1. **变量声明（isRead 之后添加）：**
 ```go
 var (
     id            int64
@@ -258,12 +131,12 @@ var (
 )
 ```
 
-2. **Scan 参数（约第 865 行，&isRead 之后添加）：**
+2. **Scan 参数（&isRead 之后添加）：**
 ```go
 if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote); err != nil {
 ```
 
-3. **字段赋值（约第 879 行，IsRead 之后添加）：**
+3. **字段赋值（IsRead 之后添加）：**
 ```go
 article := &model.Article{
     ID:           id,
@@ -276,19 +149,17 @@ article := &model.Article{
 }
 ```
 
-**修改位置说明：**
-- scanArticle 函数约在 database.go 第 854-892 行
-- 变量声明在第 856-864 行
-- Scan 调用在第 865 行
-- article 赋值在第 872-879 行
+**重要说明：**
+- scanArticle 现在扫描 9 个字段（包含 has_note）
+- Plan 13-02A 已在 model.go 添加 HasNote 字段，可直接使用
+- Scan 参数顺序必须与后续 SELECT 查询字段顺序一致
 </action>
   <verify>
     <automated>go build ./internal/storage/</automated>
-    <manual>grep -n "hasNote" internal/storage/database.go | grep "scanArticle" -A 20 | head -5</manual>
   </verify>
   <acceptance_criteria>
     - scanArticle 函数包含 `hasNote bool` 变量声明
-    - scanner.Scan 参数包含 `&hasNote`（位于 &isRead 之后）
+    - scanner.Scan 参数包含 `&hasNote`（位于 &isRead 之后，共 9 个参数）
     - article 结构体赋值包含 `HasNote: hasNote`
     - go build ./internal/storage/ 成功
   </acceptance_criteria>
@@ -298,15 +169,15 @@ scanArticle 函数更新完成，支持 has_note 字段扫描，编译通过。
 </task>
 
 <task type="auto" tdd="true">
-  <name>Task 3: 更新 scanArticleWithBlog 函数</name>
+  <name>Task 2: 更新 scanArticleWithBlog 函数</name>
   <files>internal/storage/database.go</files>
   <read_first>
     - internal/storage/database.go (查看 scanArticleWithBlog 函数定义，约第 894 行)
-    - internal/model/model.go (确认 ArticleWithBlog.HasNote 字段存在)
+    - internal/model/model.go (确认 ArticleWithBlog.HasNote 字段已由 13-02A 添加)
   </read_first>
   <behavior>
     - Test 1: scanArticleWithBlog 包含 `hasNote bool` 变量声明
-    - Test 2: scanner.Scan 参数包含 `&hasNote`
+    - Test 2: scanner.Scan 参数包含 `&hasNote`（11个参数）
     - Test 3: 返回的 article.HasNote 值正确
     - Test 4: go build ./internal/storage/ 成功
   </behavior>
@@ -315,7 +186,7 @@ scanArticle 函数更新完成，支持 has_note 字段扫描，编译通过。
 
 **具体修改（database.go scanArticleWithBlog 函数）：**
 
-1. **变量声明（约第 905 行，isRead 之后添加）：**
+1. **变量声明（blogURL 之后添加）：**
 ```go
 var (
     id            int64
@@ -332,12 +203,12 @@ var (
 )
 ```
 
-2. **Scan 参数（约第 907 行，&blogURL 之后添加）：**
+2. **Scan 参数（&blogURL 之后添加）：**
 ```go
 if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &blogName, &blogURL, &hasNote); err != nil {
 ```
 
-3. **字段赋值（约第 921 行，BlogURL 之后添加）：**
+3. **字段赋值（BlogURL 之后添加）：**
 ```go
 article := &model.ArticleWithBlog{
     ID:           id,
@@ -351,34 +222,26 @@ article := &model.ArticleWithBlog{
     HasNote:      hasNote,  // 新增
 }
 ```
-
-**修改位置说明：**
-- scanArticleWithBlog 函数约在 database.go 第 894-936 行
-- 变量声明在第 896-906 行
-- Scan 调用在第 907 行
-- article 赋值在第 914-922 行
 </action>
   <verify>
     <automated>go build ./internal/storage/</automated>
-    <manual>grep -n "hasNote" internal/storage/database.go | grep "scanArticleWithBlog" -A 20 | head -5</manual>
   </verify>
   <acceptance_criteria>
     - scanArticleWithBlog 函数包含 `hasNote bool` 变量声明
-    - scanner.Scan 参数包含 `&hasNote`（位于 &blogURL 之后）
+    - scanner.Scan 参数包含 `&hasNote`（位于 &blogURL 之后，共 11 个参数）
     - article 结构体赋值包含 `HasNote: hasNote`
     - go build ./internal/storage/ 成功
   </acceptance_criteria>
   <done>
-scanArticleWithBlog 函数更新完成，支持 has_note 字段扫描，编译通过。
+scanArticleWithBlog 函数更新完成，编译通过。
 </done>
 </task>
 
 <task type="auto" tdd="true">
-  <name>Task 4: 更新所有 Article SELECT 查询语句</name>
+  <name>Task 3: 更新所有 Article SELECT 查询语句</name>
   <files>internal/storage/database.go</files>
   <read_first>
     - internal/storage/database.go (查看所有 Article SELECT 查询)
-    - .planning/phases/13-cli-notes-infrastructure/13-PATTERNS.md (确认字段顺序)
   </read_first>
   <behavior>
     - Test 1: ListArticles SELECT 包含 has_note
@@ -432,10 +295,9 @@ query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_d
 </action>
   <verify>
     <automated>go build ./internal/storage/</automated>
-    <manual>grep -n "SELECT.*is_read.*has_note" internal/storage/database.go | wc -l</manual>
   </verify>
   <acceptance_criteria>
-    - ListArticles SELECT 包含 `is_read, has_note`
+    - ListArticles SELECT 包含 `is_read, has_note`（9个字段）
     - ListArticlesByReadStatus SELECT 包含 `is_read, has_note`
     - ListArticlesWithBlog SELECT 包含 `a.is_read, a.has_note`
     - SearchArticles SELECT 包含 `a.is_read, a.has_note`
@@ -449,15 +311,15 @@ query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_d
 </task>
 
 <task type="auto" tdd="true">
-  <name>Task 5: 更新 scanArticleWithBlogAndCount 函数</name>
+  <name>Task 4: 更新 scanArticleWithBlogAndCount 函数</name>
   <files>internal/storage/database.go</files>
   <read_first>
     - internal/storage/database.go (查看 scanArticleWithBlogAndCount 函数，约第 938 行)
-    - internal/model/model.go (确认 ArticleWithBlog.HasNote 字段)
+    - internal/model/model.go (确认 ArticleWithBlog.HasNote 字段已由 13-02A 添加)
   </read_first>
   <behavior>
     - Test 1: scanArticleWithBlogAndCount 包含 `hasNote bool` 变量
-    - Test 2: scanner.Scan 参数包含 `&hasNote`
+    - Test 2: scanner.Scan 参数包含 `&hasNote`（12个参数）
     - Test 3: 返回的 article.HasNote 值正确
     - Test 4: go build ./internal/storage/ 成功
   </behavior>
@@ -466,7 +328,7 @@ query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_d
 
 **具体修改（database.go scanArticleWithBlogAndCount 函数）：**
 
-1. **变量声明（约第 950 行，isRead 之后添加）：**
+1. **变量声明（totalCount 之后添加）：**
 ```go
 var (
     id            int64
@@ -484,12 +346,12 @@ var (
 )
 ```
 
-2. **Scan 参数（约第 952 行，&totalCount 之后添加）：**
+2. **Scan 参数（&totalCount 之后添加）：**
 ```go
 if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &blogName, &blogURL, &totalCount, &hasNote); err != nil {
 ```
 
-3. **字段赋值（约第 967 行，BlogURL 之后添加）：**
+3. **字段赋值（BlogURL 之后添加）：**
 ```go
 article := &model.ArticleWithBlog{
     ID:           id,
@@ -504,27 +366,19 @@ article := &model.ArticleWithBlog{
 }
 ```
 
-**修改位置说明：**
-- scanArticleWithBlogAndCount 函数约在 database.go 第 938-981 行
-- 变量声明在第 940-951 行
-- Scan 调用在第 952 行
-- article 赋值在第 959-969 行
+**重要：SearchArticles SELECT 字段顺序需确保 has_note 在 total_count 之前。**
 
-**重要：需要同时更新 SearchArticles 的 SELECT 语句字段顺序，确保 totalCount 在 has_note 之后。**
-
-SearchArticles SELECT 字段顺序应为：
+Task 3 已更新 SearchArticles SELECT，字段顺序为：
 ```go
 a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url, COUNT(*) OVER() as total_count
 ```
-（Task 4 已更新此查询，确保字段顺序正确）
 </action>
   <verify>
     <automated>go build ./internal/storage/</automated>
-    <manual>grep -n "hasNote" internal/storage/database.go | grep "scanArticleWithBlogAndCount" -A 20 | head -5</manual>
   </verify>
   <acceptance_criteria>
     - scanArticleWithBlogAndCount 函数包含 `hasNote bool` 变量声明
-    - scanner.Scan 参数包含 `&hasNote`（位于 &totalCount 之后）
+    - scanner.Scan 参数包含 `&hasNote`（位于 &totalCount 之后，共 12 个参数）
     - article 结构体赋值包含 `HasNote: hasNote`
     - go build ./internal/storage/ 成功
   </acceptance_criteria>
@@ -546,8 +400,8 @@ scanArticleWithBlogAndCount 函数更新完成，编译通过。
 
 | Threat ID | Category | Component | Disposition | Mitigation Plan |
 |-----------|----------|-----------|-------------|-----------------|
-| T-13-04 | Tampering | scanArticle | accept | 字段顺序错误会导致运行时错误，编译时无法检测 |
-| T-13-05 | Information Disclosure | HasNote field | accept | has_note 状态公开，无敏感信息 |
+| T-13-05 | Tampering | scanArticle | accept | 字段顺序错误会导致运行时错误，编译时无法检测。需通过测试验证。 |
+| T-13-06 | Information Disclosure | HasNote field | accept | has_note 状态公开，无敏感信息 |
 </threat_model>
 
 <verification>
@@ -555,38 +409,37 @@ scanArticleWithBlogAndCount 函数更新完成，编译通过。
 
 1. **编译验证：**
    ```bash
-   go build ./internal/model/
    go build ./internal/storage/
    ```
 
-2. **字段存在验证：**
+2. **字段扫描验证：**
    ```bash
-   grep -c "HasNote bool" internal/model/model.go
    grep -c "hasNote bool" internal/storage/database.go
    ```
+   应返回 3（scanArticle, scanArticleWithBlog, scanArticleWithBlogAndCount）
 
 3. **SELECT 查询验证：**
    ```bash
    grep -c "has_note" internal/storage/database.go
    ```
+   应返回至少 6（5 个 SELECT 查询 + 1 个迁移语句）
 
 4. **运行验证（可选）：**
    ```bash
    go run ./cmd/blogwatcher article list --format simple
    ```
-   验证查询执行无错误。
+   验证查询执行无 column count mismatch 错误。
 </verification>
 
 <success_criteria>
-1. Article 结构体包含 HasNote 字段
-2. ArticleWithBlog 结构体包含 HasNote 字段
-3. scanArticle 支持 has_note 扫描
-4. scanArticleWithBlog 支持 has_note 扫描
-5. scanArticleWithBlogAndCount 支持 has_note 扫描
-6. 所有 Article SELECT 查询包含 has_note 字段
-7. 所有代码编译通过
+1. scanArticle 支持 has_note 扫描（9 个字段）
+2. scanArticleWithBlog 支持 has_note 扫描（11 个字段）
+3. scanArticleWithBlogAndCount 支持 has_note 扫描（12 个字段）
+4. 所有 Article SELECT 查询包含 has_note 字段
+5. 所有代码编译通过
+6. 运行 article list 命令无 column count mismatch 错误
 </success_criteria>
 
 <output>
-完成后创建 `.planning/phases/13-cli-notes-infrastructure/13-02-SUMMARY.md`
+完成后创建 `.planning/phases/13-cli-notes-infrastructure/13-02B-SUMMARY.md`
 </output>

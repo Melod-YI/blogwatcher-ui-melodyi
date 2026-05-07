@@ -194,7 +194,7 @@ Plans:
 1. User can type in search box and see results filter to articles matching title text
 2. Search input debounces at 300ms and does not trigger on every keystroke
 3. User can click "Last Week" filter and see only articles from past 7 days
-4. User can click "Last Month" filter and see only articles from past 30 days
+4. User can click "Last Month" filter and see articles from past 30 days
 5. User can select custom date range and see articles within that range
 6. User can combine multiple filters (blog + status + search + date) and see articles matching all conditions
 7. Results count displays "Showing X articles" or "No articles found" based on active filters
@@ -404,11 +404,12 @@ Plans:
 
 **Depends on:** Phase 12 (CLI Foundation)
 
-**Plans:** 3 plans
+**Plans:** 4 plans
 
 Plans:
+- [ ] 13-02A-PLAN.md — Model updates (Article.HasNote, ArticleWithBlog.HasNote 字段)
+- [ ] 13-02B-PLAN.md — scan functions + SELECT queries (scanArticle, scanArticleWithBlog, scanArticleWithBlogAndCount, 所有 SELECT 查询)
 - [ ] 13-01-PLAN.md — Database layer (has_note migration, GetArticleByID, UpdateArticleHasNote)
-- [ ] 13-02-PLAN.md — Model updates (Article.HasNote, scanArticle, SELECT queries)
 - [ ] 13-03-PLAN.md — CLI note command (write, delete, command registration)
 
 ---
@@ -425,7 +426,7 @@ Plans:
 1. 用户执行 `blogwatcher article list --not-noted` 仅显示无备注文章
 2. 用户执行 `blogwatcher article list --not-noted --unread` 仅显示未读且无备注文章
 3. --not-noted 与 --blog、--after 等参数可组合使用
-4. 输出格式 (--format) 与 --not-noted 兼容
+4. 输出格式 与 --not-noted 兼容
 
 **Depends on:** Phase 13 (CLI Notes Infrastructure)
 
