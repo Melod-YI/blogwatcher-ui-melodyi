@@ -91,9 +91,22 @@ Requirements for v1.2 milestone (Blog Management).
 - [ ] **REM-02**: User can choose to delete blog only or blog + articles
 - [ ] **REM-03**: Confirmation dialog shows article count that would be deleted
 
-## Future Requirements
+## v1.3 Requirements
 
-Deferred to v1.3 or later. Tracked but not in current roadmap.
+Requirements for v1.3 milestone (CLI System).
+
+### CLI Core Commands
+
+- [ ] **CLI-01**: `blogwatcher blog scan` scans all blogs for new articles
+- [ ] **CLI-02**: `blogwatcher article list` displays articles with filtering options (--blog, --unread, --read, --after) and format options (--format table|json|simple)
+- [ ] **CLI-03**: `blogwatcher article mark-read <id>` marks single article as read; `--all` marks all articles as read
+- [ ] **CLI-04**: `blogwatcher article mark-unread <id>` marks single article as unread
+
+### CLI Infrastructure
+
+- [ ] **CLI-05**: CLI shares database with UI (default path ~/.blogwatcher/blogwatcher.db); supports --db flag for custom path
+- [ ] **CLI-06**: CLI can be installed via `go install` from project repository; unified entry point with `blogwatcher serve` for UI server
+- [ ] **CLI-07**: `blogwatcher serve` starts UI server (replaces original server entry point)
 
 ### Search Enhancements
 
@@ -186,15 +199,29 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REM-02 | Phase 11 | Pending |
 | REM-03 | Phase 11 | Pending |
 
+### v1.3 Requirements (Planned)
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CLI-01 | Phase 12 | Planned |
+| CLI-02 | Phase 12 | Planned |
+| CLI-03 | Phase 12 | Planned |
+| CLI-04 | Phase 12 | Planned |
+| CLI-05 | Phase 12 | Planned |
+| CLI-06 | Phase 12 | Planned |
+| CLI-07 | Phase 12 | Planned |
+
 **Coverage:**
 - v1.0 requirements: 15 mapped (100%)
 - v1.1 requirements: 15 mapped (100%)
 - v1.2 requirements: 13 mapped (100%)
-- Total: 43 requirements
+- v1.3 requirements: 7 mapped (100%)
+- Total: 50 requirements
 
 ---
 *Requirements defined: 2026-02-02*
 *v1.1 complete: 2026-02-03*
 *v1.2 requirements added: 2026-02-08*
 *v1.2 traceability mapped: 2026-02-08*
-*Last updated: 2026-02-08*
+*v1.3 requirements added: 2026-05-07*
+*Last updated: 2026-05-07*

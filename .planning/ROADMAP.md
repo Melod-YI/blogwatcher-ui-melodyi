@@ -2,13 +2,14 @@
 
 **Created:** 2026-02-02
 **Depth:** standard
-**Total Phases:** 11
+**Total Phases:** 12
 
 ## Milestones
 
 - **v1.0 MVP** - Phases 1-5 (shipped 2026-02-03)
 - **v1.1 UI Polish & Search** - Phases 6-8 (shipped 2026-02-03)
 - **v1.2 Blog Management** - Phases 9-11 (shipped 2026-02-09)
+- **v1.3 CLI System** - Phase 12 (planning)
 
 ## Phases
 
@@ -328,6 +329,48 @@ Plans:
 
 ---
 
+## v1.3 CLI System (Planning)
+
+**Milestone Goal:** 提供独立的 CLI 工具，可通过 `go install` 安装，完成扫描、列出文章、标记已读/未读等核心操作，共享 UI 项目数据库。
+
+### Phase 12: CLI Foundation
+
+**Goal:** 用户可以通过子命令风格的 CLI 完成博客扫描、文章列表查看、标记操作。
+
+**Requirements:**
+- CLI-01: 扫描博客命令
+- CLI-02: 列出文章命令（支持筛选参数和多格式输出）
+- CLI-03: 标记已读命令（单篇和批量）
+- CLI-04: 标记未读命令
+- CLI-05: 共享数据库路径
+- CLI-06: 可通过 go install 安装
+
+**Success Criteria:**
+1. 用户可以通过 `go install` 安装 CLI
+2. `blogwatcher serve` 启动 UI 服务器（替代原 server 入口）
+3. `blogwatcher blog scan` 成功扫描所有博客并获取新文章
+4. `blogwatcher blog scan <name>` 成功扫描指定博客
+5. `blogwatcher article list` 显示所有文章（默认表格格式）
+6. `blogwatcher article list --blog <name>` 按博客筛选
+7. `blogwatcher article list --unread/--read` 按状态筛选
+8. `blogwatcher article list --after <date>` 按日期筛选
+9. `blogwatcher article list --format json` 输出 JSON 格式
+10. `blogwatcher article mark-read <id>` 标记单篇已读
+11. `blogwatcher article mark-read --all` 标记全部已读
+12. `blogwatcher article mark-unread <id>` 标记单篇未读
+13. CLI 与 UI 共享同一数据库（默认 ~/.blogwatcher/blogwatcher.db）
+
+**Depends on:** Phase 4 (Article Management - scanner package)
+
+**Plans:** 3 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — CLI framework setup (cobra root, global flags, serve command)
+- [ ] 12-02-PLAN.md — Blog commands (scan all, scan specific)
+- [ ] 12-03-PLAN.md — Article commands (list, mark-read, mark-unread)
+
+---
+
 ## Coverage Validation
 
 ### v1.0 Requirements
@@ -394,6 +437,20 @@ Plans:
 
 **v1.2 Coverage:** 13/13 requirements mapped (100%)
 
+### v1.3 Requirements
+
+| Requirement | Phase | Covered |
+|-------------|-------|---------|
+| CLI-01 | 12 | Planned |
+| CLI-02 | 12 | Planned |
+| CLI-03 | 12 | Planned |
+| CLI-04 | 12 | Planned |
+| CLI-05 | 12 | Planned |
+| CLI-06 | 12 | Planned |
+| CLI-07 | 12 | Planned |
+
+**v1.3 Coverage:** 7/7 requirements mapped (100%)
+
 ---
 
 ## Phase Progress
@@ -424,10 +481,17 @@ Plans:
 | 10 - Add Blog Flow | Complete | 100% |
 | 11 - Edit and Remove Blogs | Complete | 100% |
 
+### v1.3 (Planning)
+
+| Phase | Status | Progress |
+|-------|--------|----------|
+| 12 - CLI Foundation | Planned | 0% |
+
 **v1.0 Progress:** 5/5 phases complete (100%)
 **v1.1 Progress:** 3/3 phases complete (100%)
 **v1.2 Progress:** 3/3 phases complete (100%)
-**Overall Progress:** 11/11 phases complete (100%)
+**v1.3 Progress:** 0/1 phases complete (0%)
+**Overall Progress:** 11/12 phases complete (92%)
 
 ---
 
@@ -448,4 +512,6 @@ Plans:
 *Phase 11 planned: 2026-02-09*
 *Phase 11 complete: 2026-02-09*
 *v1.2 COMPLETE: 2026-02-09*
-*Last updated: 2026-02-09*
+*v1.3 roadmap added: 2026-05-07*
+*Phase 12 planned: 2026-05-07*
+*Last updated: 2026-05-07*
