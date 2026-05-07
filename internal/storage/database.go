@@ -163,6 +163,13 @@ func (db *Database) ensureMigrations() error {
 		}
 	}
 
+	// Add has_note column if it doesn't exist
+	if !db.columnExists("articles", "has_note") {
+		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN has_note BOOLEAN DEFAULT FALSE`); err != nil {
+			return fmt.Errorf("failed to add has_note column: %w", err)
+		}
+	}
+
 	return nil
 }
 
