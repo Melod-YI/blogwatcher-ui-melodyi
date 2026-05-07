@@ -10,7 +10,7 @@
 - ✅ **v1.1 UI Polish & Search** - Phases 6-8 (shipped 2026-02-03)
 - ✅ **v1.2 Blog Management** - Phases 9-11 (shipped 2026-02-09)
 - ✅ **v1.3 CLI System** - Phase 12 (shipped 2026-05-07)
-- 🔄 **v1.4 Article Notes** - Phases 13-15 (planning)
+- 🔄 **v1.4 Article Notes** - Phases 13-15 (Phase 13 complete)
 
 ## Phases
 
@@ -404,7 +404,7 @@ Plans:
 
 **Depends on:** Phase 12 (CLI Foundation)
 
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 **Wave 1**
@@ -417,7 +417,7 @@ Plans:
 - [x] 13-01-PLAN.md — Database layer (has_note migration, GetArticleByID, UpdateArticleHasNote)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 13-03-PLAN.md — CLI note command (write, delete, command registration)
+- [x] 13-03-PLAN.md — CLI note command (write, delete, command registration)
 
 ---
 
@@ -604,7 +604,7 @@ Plans:
 
 | Phase | Status | Progress |
 |-------|--------|----------|
-| 13 - CLI Notes Infrastructure | Active | 25% (1/4) |
+| 13 - CLI Notes Infrastructure | Complete | 100% (4/4) |
 | 14 - CLI Filtering Enhancement | Planned | 0% |
 | 15 - UI Note Display | Planned | 0% |
 
@@ -612,8 +612,8 @@ Plans:
 **v1.1 Progress:** 3/3 phases complete (100%)
 **v1.2 Progress:** 3/3 phases complete (100%)
 **v1.3 Progress:** 1/1 phases complete (100%)
-**v1.4 Progress:** 0/3 phases complete (0%) — 1 plan complete (13-02A)
-**Overall Progress:** 12/15 phases complete (80%)
+**v1.4 Progress:** 1/3 phases complete (33%) — 4 plans complete
+**Overall Progress:** 13/15 phases complete (87%)
 
 ---
 
@@ -637,5 +637,5 @@ Plans:
 *v1.3 roadmap added: 2026-05-07*
 *Phase 12 planned: 2026-05-07*
 *v1.4 roadmap added: 2026-05-07*
-*Plan 13-02A complete: 2026-05-07*
+*Plan 13-03 complete: 2026-05-07*
 *Last updated: 2026-05-07*

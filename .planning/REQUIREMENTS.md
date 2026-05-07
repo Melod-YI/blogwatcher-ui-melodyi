@@ -9,9 +9,9 @@ Requirements for Article Notes milestone. Each maps to roadmap phases.
 
 ### CLI Notes
 
-- [ ] **NOTE-01**: CLI `note --article-id <id> --file <path>` 写入备注（完整复制文件内容）
-- [ ] **NOTE-02**: CLI `note delete --article-id <id>` 删除备注
-- [ ] **NOTE-03**: 缺少必填参数时报错退出
+- [x] **NOTE-01**: CLI `note --article-id <id> --file <path>` 写入备注（完整复制文件内容）
+- [x] **NOTE-02**: CLI `note delete --article-id <id>` 删除备注
+- [x] **NOTE-03**: 缺少必填参数时报错退出
 
 ### CLI Filtering
 
@@ -20,7 +20,7 @@ Requirements for Article Notes milestone. Each maps to roadmap phases.
 
 ### Storage
 
-- [ ] **NOTE-06**: 备注存储于 ~/.blogwatcher/notes/{article_id}.md
+- [x] **NOTE-06**: 备注存储于 ~/.blogwatcher/notes/{article_id}.md
 - [x] **NOTE-07**: articles 表新增 has_note BOOLEAN 字段
 - [x] **NOTE-08**: 写入/删除备注时同步更新 has_note 字段
 
@@ -58,12 +58,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| NOTE-01 | Phase 13 | Pending |
-| NOTE-02 | Phase 13 | Pending |
-| NOTE-03 | Phase 13 | Pending |
+| NOTE-01 | Phase 13 | Complete |
+| NOTE-02 | Phase 13 | Complete |
+| NOTE-03 | Phase 13 | Complete |
 | NOTE-04 | Phase 14 | Pending |
 | NOTE-05 | Phase 14 | Pending |
-| NOTE-06 | Phase 13 | Pending |
+| NOTE-06 | Phase 13 | Complete |
 | NOTE-07 | Phase 13 | Complete |
 | NOTE-08 | Phase 13 | Complete |
 | NOTE-09 | Phase 15 | Pending |
