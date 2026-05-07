@@ -1,18 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Blog Management
-current_phase: 12
-status: completed
-stopped_at: v1.2 milestone complete
-last_updated: "2026-05-07T12:14:24.569Z"
+milestone: v1.4
+milestone_name: Article Notes
+status: planning
+last_updated: "2026-05-07T12:57:56.046Z"
 last_activity: 2026-05-07
 progress:
-  total_phases: 3
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 5
-  percent: 83
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: BlogWatcher UI
@@ -40,15 +38,10 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 
 ## Current Position
 
-Phase: 12 (cli-foundation) — EXECUTING
-Plan: 1 of 3
-**Milestone:** v1.2 (Blog Management) - Complete
-**Phase:** Phase 11 - Edit and Remove Blogs (COMPLETE)
-**Plan:** Not started
-**Status:** v1.3 milestone complete
-**Last activity:** 2026-05-07
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-07 — Milestone v1.4 started
 
 ## Performance Metrics
 

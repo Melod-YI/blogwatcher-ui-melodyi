@@ -8,20 +8,22 @@ A web-based reader UI for the existing blogwatcher CLI tool. It provides an Omni
 
 Read and manage blog articles through a clean, responsive web interface without touching the CLI.
 
-## Current Milestone: v1.3 CLI System (COMPLETE)
+## Current Milestone: v1.4 Article Notes
 
-**Goal:** 提供独立的 CLI 工具，可通过 `go install` 安装，完成扫描、列出文章、标记已读/未读等核心操作。
+**Goal:** 允许用户为文章编写备注，备注为 Markdown 文档，可在 UI 查看。
 
-**Shipped features:**
-- CLI 统一入口点 (cmd/blogwatcher/main.go)
-- serve 子命令启动 UI 服务器
-- blog scan 命令扫描所有/指定博客
-- article list 命令支持多筛选和多格式输出
-- article mark-read/mark-unread 命令
+**Target features:**
+- CLI `note --article-id <id> --file <path>` 命令：写入备注（复制文件内容）
+- CLI `note delete --article-id <id>` 命令：删除备注
+- CLI `article list --not-noted` 筛选：未读且无备注的文章
+- 备注存储：Markdown 文件 (`~/.blogwatcher/notes/{article_id}.md`)
+- UI：仅在有备注的文章卡片上显示按钮，点击后新标签页打开渲染页面
 
 ## Requirements
 
 ### Validated
+
+Shipped in v1.0-v1.3 (see previous milestone details in MILESTONES.md)
 
 Shipped in v1.0:
 
@@ -87,7 +89,12 @@ Shipped in v1.3:
 
 ### Active
 
-(Next milestone TBD)
+- [ ] **NOTE-01**: CLI `note --article-id <id> --file <path>` 写入备注
+- [ ] **NOTE-02**: CLI `note delete --article-id <id>` 删除备注
+- [ ] **NOTE-03**: CLI `article list --not-noted` 筛选未读且无备注文章
+- [ ] **NOTE-04**: 备注文件存储于 `~/.blogwatcher/notes/{article_id}.md`
+- [ ] **NOTE-05**: UI 文章卡片显示备注按钮（仅在有备注时显示）
+- [ ] **NOTE-06**: UI 点击备注按钮新标签页打开 Markdown 渲染页面
 
 ### Out of Scope
 
@@ -138,5 +145,22 @@ Shipped in v1.3:
 | Unified entry point (cmd/blogwatcher) | Single binary for UI and CLI, go install compatible | ✓ Good (v1.3) |
 | Output formatters as package | Separate internal/cli/output for table/json/simple formats | ✓ Good (v1.3) |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-05-07 after v1.3 milestone*
+*Last updated: 2026-05-07 after v1.4 milestone start*
