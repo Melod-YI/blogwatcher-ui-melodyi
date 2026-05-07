@@ -408,7 +408,7 @@ Plans:
 
 Plans:
 **Wave 1**
-- [ ] 13-02A-PLAN.md — Model updates (Article.HasNote, ArticleWithBlog.HasNote 字段)
+- [x] 13-02A-PLAN.md — Model updates (Article.HasNote, ArticleWithBlog.HasNote 字段)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 13-02B-PLAN.md — scan functions + SELECT queries (scanArticle, scanArticleWithBlog, scanArticleWithBlogAndCount, 所有 SELECT 查询)
@@ -600,11 +600,11 @@ Plans:
 |-------|--------|----------|
 | 12 - CLI Foundation | Complete | 100% |
 
-### v1.4 (Planning)
+### v1.4 (Active)
 
 | Phase | Status | Progress |
 |-------|--------|----------|
-| 13 - CLI Notes Infrastructure | Planned | 0% |
+| 13 - CLI Notes Infrastructure | Active | 25% (1/4) |
 | 14 - CLI Filtering Enhancement | Planned | 0% |
 | 15 - UI Note Display | Planned | 0% |
 
@@ -612,7 +612,7 @@ Plans:
 **v1.1 Progress:** 3/3 phases complete (100%)
 **v1.2 Progress:** 3/3 phases complete (100%)
 **v1.3 Progress:** 1/1 phases complete (100%)
-**v1.4 Progress:** 0/3 phases complete (0%)
+**v1.4 Progress:** 0/3 phases complete (0%) — 1 plan complete (13-02A)
 **Overall Progress:** 12/15 phases complete (80%)
 
 ---
@@ -637,4 +637,5 @@ Plans:
 *v1.3 roadmap added: 2026-05-07*
 *Phase 12 planned: 2026-05-07*
 *v1.4 roadmap added: 2026-05-07*
+*Plan 13-02A complete: 2026-05-07*
 *Last updated: 2026-05-07*

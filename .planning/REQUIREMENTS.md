@@ -21,7 +21,7 @@ Requirements for Article Notes milestone. Each maps to roadmap phases.
 ### Storage
 
 - [ ] **NOTE-06**: 备注存储于 ~/.blogwatcher/notes/{article_id}.md
-- [ ] **NOTE-07**: articles 表新增 has_note BOOLEAN 字段
+- [x] **NOTE-07**: articles 表新增 has_note BOOLEAN 字段
 - [ ] **NOTE-08**: 写入/删除备注时同步更新 has_note 字段
 
 ### UI Display
@@ -64,7 +64,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NOTE-04 | Phase 14 | Pending |
 | NOTE-05 | Phase 14 | Pending |
 | NOTE-06 | Phase 13 | Pending |
-| NOTE-07 | Phase 13 | Pending |
+| NOTE-07 | Phase 13 | Complete |
 | NOTE-08 | Phase 13 | Pending |
 | NOTE-09 | Phase 15 | Pending |
 | NOTE-10 | Phase 15 | Pending |
