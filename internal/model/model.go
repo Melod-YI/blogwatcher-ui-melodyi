@@ -22,6 +22,7 @@ type Article struct {
 	PublishedDate  *time.Time
 	DiscoveredDate *time.Time
 	IsRead         bool
+	HasNote        bool // 文章备注状态
 }
 
 // ArticleWithBlog extends Article with blog metadata for display in article cards.
@@ -37,6 +38,7 @@ type ArticleWithBlog struct {
 	IsRead         bool
 	BlogName       string
 	BlogURL        string
+	HasNote        bool // 文章备注状态
 }
 
 // SearchOptions contains all filter parameters for article search.
