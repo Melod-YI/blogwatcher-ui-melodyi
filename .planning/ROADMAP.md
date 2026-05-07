@@ -404,17 +404,17 @@ Plans:
 
 **Depends on:** Phase 12 (CLI Foundation)
 
-**Plans:** 4 plans
+**Plans:** 3/4 plans executed
 
 Plans:
 **Wave 1**
 - [x] 13-02A-PLAN.md — Model updates (Article.HasNote, ArticleWithBlog.HasNote 字段)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 13-02B-PLAN.md — scan functions + SELECT queries (scanArticle, scanArticleWithBlog, scanArticleWithBlogAndCount, 所有 SELECT 查询)
+- [x] 13-02B-PLAN.md — scan functions + SELECT queries (scanArticle, scanArticleWithBlog, scanArticleWithBlogAndCount, 所有 SELECT 查询)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 13-01-PLAN.md — Database layer (has_note migration, GetArticleByID, UpdateArticleHasNote)
+- [x] 13-01-PLAN.md — Database layer (has_note migration, GetArticleByID, UpdateArticleHasNote)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 13-03-PLAN.md — CLI note command (write, delete, command registration)
