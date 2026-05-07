@@ -404,7 +404,12 @@ Plans:
 
 **Depends on:** Phase 12 (CLI Foundation)
 
-**Plans:** 0 plans (not yet created)
+**Plans:** 3 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Database layer (has_note migration, GetArticleByID, UpdateArticleHasNote)
+- [ ] 13-02-PLAN.md — Model updates (Article.HasNote, scanArticle, SELECT queries)
+- [ ] 13-03-PLAN.md — CLI note command (write, delete, command registration)
 
 ---
 
