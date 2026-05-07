@@ -28,6 +28,8 @@ func init() {
 	// 设置版本输出模板
 	rootCmd.SetVersionTemplate(`{{.Name}} {{.Version}}
 `)
+	// 添加 serve 子命令
+	rootCmd.AddCommand(NewServeCmd())
 }
 
 // Execute 执行根命令
