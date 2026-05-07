@@ -595,6 +595,23 @@ func (db *Database) MarkArticleUnread(id int64) (bool, error) {
 	return rows > 0, nil
 }
 
+// UpdateArticleHasNote updates the has_note field for an article.
+// Returns error if the article does not exist.
+func (db *Database) UpdateArticleHasNote(id int64, hasNote bool) error {
+	result, err := db.conn.Exec(`UPDATE articles SET has_note = ? WHERE id = ?`, hasNote, id)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("article not found: %d", id)
+	}
+	return nil
+}
+
 // MarkAllUnreadArticlesRead marks all unread articles as read.
 // If blogID is provided, only marks articles from that blog.
 func (db *Database) MarkAllUnreadArticlesRead(blogID *int64) error {
