@@ -493,11 +493,11 @@ Plans:
 
 **Depends on:** Phase 15 (UI Note Display)
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 16-01-PLAN.md — 创建 categories 表和 blogs.category_id 字段
-- [ ] 16-02-PLAN.md — AddArticlesBulk INSERT OR IGNORE + ScanResult skipped_count
+- [x] 16-02-PLAN.md — AddArticlesBulk INSERT OR IGNORE + ScanResult skipped_count
 ---
 
 ### Phase 17: Category Management UI
