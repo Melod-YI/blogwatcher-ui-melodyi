@@ -5,6 +5,7 @@ package server
 import (
 	"bytes"
 	"html/template"
+	"log"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
@@ -27,8 +28,9 @@ func renderMarkdown(content string) template.HTML {
 
 	var buf bytes.Buffer
 	if err := md.Convert([]byte(content), &buf); err != nil {
-		// On error, return original content
-		return template.HTML(content)
+		log.Printf("Error rendering markdown: %v", err)
+		// Return escaped content to prevent XSS
+		return template.HTML(template.HTMLEscapeString(content))
 	}
 	return template.HTML(buf.String())
 }
