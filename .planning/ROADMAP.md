@@ -513,14 +513,19 @@ Plans:
 
 **Success Criteria:**
 1. 设置页面显示分类管理区（独立区域）
-2. 点击"新建分类"按钮，输入名称后立即保存
+2. 点击新建分类按钮，输入名称后立即保存
 3. 分类名称可 inline 编辑（点击名称直接编辑）
 4. 删除分类时，关联 blog 的 category_id 自动置空
 5. Blog 编辑行显示分类下拉选择框
 
 **Depends on:** Phase 16 (Database Schema)
 
-**Plans:** 0 plans
+**Plans:** 3 plans
+
+Plans:
+- [ ] 17-01-PLAN.md — 数据库方法实现（CreateCategory, ListCategoriesWithBlogCount, UpdateCategoryName, DeleteCategory, UpdateBlogCategory）
+- [ ] 17-02-PLAN.md — 分类 Handler 和 Templates（handleCategoriesNew/Create/Edit/Update/Delete, category-section/item/edit-form/add-form/delete-dialog templates）
+- [ ] 17-03-PLAN.md — Blog 分类选择集成（settings-page + blog-edit-form 扩展）
 
 ---
 
