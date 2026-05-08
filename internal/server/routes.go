@@ -16,6 +16,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /articles", s.handleArticleList)
 	s.mux.HandleFunc("GET /blogs", s.handleBlogList)
 	s.mux.HandleFunc("GET /settings", s.handleSettings)
+	s.mux.HandleFunc("GET /note/{id}", s.handleNote)
 
 	// Article management actions
 	s.mux.HandleFunc("POST /articles/{id}/read", s.handleMarkRead)

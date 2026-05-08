@@ -1624,3 +1624,205 @@ html:has(#theme-dark:checked) .action-btn-summarize {
     justify-content: flex-end;
   }
 }
+
+/* ============================================
+   Markdown Content Styling
+   ============================================ */
+.markdown-body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+.markdown-body h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 1.5rem 0 1rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-body h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.75rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-body h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+}
+
+.markdown-body h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.markdown-body p {
+  margin: 0.75rem 0;
+}
+
+.markdown-body ul, .markdown-body ol {
+  margin: 0.75rem 0;
+  padding-left: 2rem;
+}
+
+.markdown-body li {
+  margin: 0.25rem 0;
+}
+
+.markdown-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.875em;
+  background-color: var(--bg-elevated);
+  padding: 0.125rem 0.25rem;
+  border-radius: 4px;
+}
+
+.markdown-body pre {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.875rem;
+  background-color: var(--bg-elevated);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.markdown-body pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.markdown-body blockquote {
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  border-left: 4px solid var(--accent);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.markdown-body table th {
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  background-color: var(--bg-elevated);
+}
+
+.markdown-body table td {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+}
+
+.markdown-body table tr:nth-child(2n) {
+  background-color: var(--bg-elevated);
+}
+
+/* Task list styling */
+.markdown-body input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+/* Strikethrough */
+.markdown-body del {
+  color: var(--text-secondary);
+}
+
+/* HR */
+.markdown-body hr {
+  height: 0;
+  margin: 1.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================
+   Note Page Layout
+   ============================================ */
+.note-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+}
+
+.note-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.note-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.note-original-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--accent);
+  font-size: 0.875rem;
+}
+
+.note-original-link:hover {
+  text-decoration: underline;
+}
+
+.note-content {
+  flex: 1;
+}
+
+.note-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+}
+
+.note-empty p {
+  margin: 0.5rem 0;
+}
+
+.note-empty code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  background-color: var(--bg-elevated);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .note-page {
+    padding: 1rem;
+  }
+
+  .note-title {
+    font-size: 1.5rem;
+  }
+}

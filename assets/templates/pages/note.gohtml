@@ -1,0 +1,45 @@
+{{define "note.gohtml"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#FAF8F5" media="(prefers-color-scheme: light)">
+    <script>
+    (function() {
+      var theme = localStorage.getItem('theme') || 'system';
+      var isDark = theme === 'dark' ||
+        (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+    </script>
+    <title>{{.Title}} - 备注 - BlogWatcher</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="note-page">
+        <header class="note-header">
+            <h1 class="note-title">{{.Title}}</h1>
+            <a href="{{.URL}}" target="_blank" rel="noopener noreferrer" class="note-original-link">
+                查看原文 ↗
+            </a>
+        </header>
+        <main class="note-content">
+            {{if .Content}}
+            <div class="markdown-body">
+                {{renderMarkdown .Content}}
+            </div>
+            {{else}}
+            <div class="note-empty">
+                <p>备注内容为空</p>
+                <p class="note-empty-hint">使用 CLI 命令添加备注：<code>blogwatcher note --article-id {{.ID}} --file your-note.md</code></p>
+            </div>
+            {{end}}
+        </main>
+    </div>
+</body>
+</html>
+{{end}}
