@@ -7,6 +7,7 @@ require (
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/otiai10/opengraph/v2 v2.2.0
 	github.com/spf13/cobra v1.9.1
+	github.com/yuin/goldmark v1.7.8
 	modernc.org/sqlite v1.44.3
 )
 
