@@ -1090,10 +1090,11 @@ func (db *Database) UpdateArticleThumbnail(id int64, thumbnailURL string) error 
 }
 
 // ListFilterOptions 筛选文章的选项参数
-// 用于 CLI article list 命令，支持按博客名称、已读状态、日期筛选
+// 用于 CLI article list 命令，支持按博客名称、已读状态、备注状态、日期筛选
 type ListFilterOptions struct {
 	BlogName  string     // 博客名称筛选（空表示所有博客）
 	IsRead    *bool      // 已读状态筛选（nil 表示所有状态）
+	HasNote   *bool      // 备注状态筛选（nil 表示所有状态，false 表示无备注）
 	AfterDate *time.Time // 日期筛选（nil 表示无限制）
 	Limit     int        // 结果数量限制（0 表示无限制）
 }
@@ -1120,6 +1121,12 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 	if opts.IsRead != nil {
 		conditions = append(conditions, "a.is_read = ?")
 		args = append(args, *opts.IsRead)
+	}
+
+	// 备注状态筛选
+	if opts.HasNote != nil {
+		conditions = append(conditions, "a.has_note = ?")
+		args = append(args, *opts.HasNote)
 	}
 
 	// 日期筛选（使用 published_date 或 discovered_date）

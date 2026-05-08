@@ -37,7 +37,7 @@ func NewArticleCmd() *cobra.Command {
 }
 
 // NewListCmd 创建 list 子命令
-// 支持筛选参数：--blog、--unread/--read、--after、--format
+// 支持筛选参数：--blog、--unread/--read、--not-noted、--after、--format
 func NewListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -48,6 +48,7 @@ func NewListCmd() *cobra.Command {
   --blog <name>    按博客名称筛选
   --unread         仅显示未读文章
   --read           仅显示已读文章
+  --not-noted      仅显示无备注文章
   --after <date>   显示指定日期之后的文章（格式 YYYY-MM-DD）
 
 输出格式：
@@ -58,6 +59,8 @@ func NewListCmd() *cobra.Command {
 示例：
   blogwatcher article list
   blogwatcher article list --unread
+  blogwatcher article list --not-noted
+  blogwatcher article list --not-noted --unread
   blogwatcher article list --blog "Tech Blog" --unread --after 2026-01-01
   blogwatcher article list --format json`,
 		Run: runList,
@@ -67,6 +70,7 @@ func NewListCmd() *cobra.Command {
 	cmd.Flags().String("blog", "", "博客名称筛选")
 	cmd.Flags().Bool("unread", false, "仅未读文章")
 	cmd.Flags().Bool("read", false, "仅已读文章")
+	cmd.Flags().Bool("not-noted", false, "仅无备注文章")
 	cmd.Flags().String("after", "", "日期筛选（格式 YYYY-MM-DD）")
 	cmd.Flags().String("format", "table", "输出格式（table|json|simple）")
 
@@ -139,6 +143,7 @@ func runList(cmd *cobra.Command, args []string) {
 	blogName, _ := cmd.Flags().GetString("blog")
 	unread, _ := cmd.Flags().GetBool("unread")
 	read, _ := cmd.Flags().GetBool("read")
+	notNoted, _ := cmd.Flags().GetBool("not-noted")
 	afterStr, _ := cmd.Flags().GetString("after")
 	format, _ := cmd.Flags().GetString("format")
 
@@ -156,6 +161,12 @@ func runList(cmd *cobra.Command, args []string) {
 		opts.IsRead = &isRead
 	}
 	// 如果都没有设置，opts.IsRead 为 nil（所有状态）
+
+	// 设置 HasNote 状态筛选
+	if notNoted {
+		hasNote := false
+		opts.HasNote = &hasNote
+	}
 
 	// 解析日期筛选
 	if afterStr != "" {
