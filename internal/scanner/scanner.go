@@ -16,11 +16,12 @@ import (
 )
 
 type ScanResult struct {
-	BlogName    string
-	NewArticles int
-	TotalFound  int
-	Source      string
-	Error       string
+	BlogName     string
+	NewArticles  int
+	SkippedCount int // 因重复 URL 跳过的文章数量
+	TotalFound   int
+	Source       string
+	Error        string
 }
 
 // ScanBlog scans a single blog for articles. It performs an incremental sync:
