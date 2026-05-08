@@ -263,12 +263,15 @@ func TestSchemaIncludesArticlesTable(t *testing.T) {
 		{BlogID: blog.ID, Title: "Article 1", URL: "https://example.com/1"},
 		{BlogID: blog.ID, Title: "Article 2", URL: "https://example.com/2"},
 	}
-	count, err := db.AddArticlesBulk(articles)
+	inserted, skipped, err := db.AddArticlesBulk(articles)
 	if err != nil {
 		t.Fatalf("add articles: %v", err)
 	}
-	if count != 2 {
-		t.Fatalf("expected 2 articles inserted, got %d", count)
+	if inserted != 2 {
+		t.Fatalf("expected 2 articles inserted, got %d", inserted)
+	}
+	if skipped != 0 {
+		t.Fatalf("expected 0 articles skipped, got %d", skipped)
 	}
 
 	// Verify articles can be listed

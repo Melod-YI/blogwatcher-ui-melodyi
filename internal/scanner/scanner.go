@@ -16,11 +16,12 @@ import (
 )
 
 type ScanResult struct {
-	BlogName    string
-	NewArticles int
-	TotalFound  int
-	Source      string
-	Error       string
+	BlogName     string
+	NewArticles  int
+	SkippedCount int // 因重复 URL 跳过的文章数量
+	TotalFound   int
+	Source       string
+	Error        string
 }
 
 // ScanBlog scans a single blog for articles. It performs an incremental sync:
@@ -29,8 +30,9 @@ type ScanResult struct {
 // genuinely new articles.
 func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanResult {
 	var (
-		source  = "none"
-		errText string
+		source       = "none"
+		errText      string
+		skippedCount int
 	)
 
 	feedURL := blog.FeedURL
@@ -145,22 +147,24 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 	// Phase 5: Persist new articles
 	newCount := 0
 	if len(newArticles) > 0 {
-		count, err := db.AddArticlesBulk(newArticles)
+		inserted, skipped, err := db.AddArticlesBulk(newArticles)
 		if err != nil {
 			errText = err.Error()
 		} else {
-			newCount = count
+			newCount = inserted
+			skippedCount = skipped
 		}
 	}
 
 	_ = db.UpdateBlogLastScanned(blog.ID, time.Now())
 
 	return ScanResult{
-		BlogName:    blog.Name,
-		NewArticles: newCount,
-		TotalFound:  len(seenURLs),
-		Source:      source,
-		Error:       errText,
+		BlogName:     blog.Name,
+		NewArticles:  newCount,
+		SkippedCount: skippedCount,
+		TotalFound:   len(seenURLs),
+		Source:       source,
+		Error:        errText,
 	}
 }
 

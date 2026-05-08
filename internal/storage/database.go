@@ -793,24 +793,25 @@ func (db *Database) UpdateBlogLastScanned(id int64, lastScanned time.Time) error
 }
 
 // AddArticlesBulk inserts multiple articles in a single transaction.
-// Returns the count of inserted articles.
-func (db *Database) AddArticlesBulk(articles []model.Article) (int, error) {
+// Uses INSERT OR IGNORE to silently skip duplicate URLs.
+// Returns the count of inserted and skipped articles.
+func (db *Database) AddArticlesBulk(articles []model.Article) (inserted int, skipped int, error error) {
 	if len(articles) == 0 {
-		return 0, nil
+		return 0, 0, nil
 	}
 	tx, err := db.conn.Begin()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	stmt, err := tx.Prepare(`INSERT INTO articles (blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO articles (blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read) VALUES (?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		_ = tx.Rollback()
-		return 0, err
+		return 0, 0, err
 	}
 	defer stmt.Close()
 
 	for _, article := range articles {
-		_, err := stmt.Exec(
+		result, err := stmt.Exec(
 			article.BlogID,
 			article.Title,
 			article.URL,
@@ -821,13 +822,19 @@ func (db *Database) AddArticlesBulk(articles []model.Article) (int, error) {
 		)
 		if err != nil {
 			_ = tx.Rollback()
-			return 0, err
+			return inserted, skipped, err
+		}
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 1 {
+			inserted++
+		} else {
+			skipped++
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return 0, err
+		return inserted, skipped, err
 	}
-	return len(articles), nil
+	return inserted, skipped, nil
 }
 
 // GetExistingArticleURLs returns a set of article URLs that already exist in the database.
