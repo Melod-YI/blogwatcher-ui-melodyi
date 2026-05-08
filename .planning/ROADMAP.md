@@ -437,7 +437,7 @@ Plans:
 
 **Depends on:** Phase 13 (CLI Notes Infrastructure)
 
-**Plans:** 0 plans (not yet created)
+**Plans:** 1/1 plans complete
 
 ---
 
