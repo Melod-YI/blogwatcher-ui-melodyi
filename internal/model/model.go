@@ -4,6 +4,13 @@ package model
 
 import "time"
 
+// Category represents a blog category for organizing blogs.
+type Category struct {
+	ID        int64
+	Name      string
+	CreatedAt time.Time
+}
+
 type Blog struct {
 	ID             int64
 	Name           string

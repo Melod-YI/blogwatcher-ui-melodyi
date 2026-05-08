@@ -109,6 +109,17 @@ func (db *Database) initSchema() error {
 // ensureMigrations runs idempotent schema migrations for new columns and tables.
 // Checks column/table existence before adding.
 func (db *Database) ensureMigrations() error {
+	// Create categories table if it doesn't exist
+	if !db.tableExists("categories") {
+		if _, err := db.conn.Exec(`CREATE TABLE IF NOT EXISTS categories (
+			id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`); err != nil {
+			return fmt.Errorf("failed to create categories table: %w", err)
+		}
+	}
+
 	// Add thumbnail_url column if it doesn't exist
 	if !db.columnExists("articles", "thumbnail_url") {
 		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN thumbnail_url TEXT`); err != nil {
