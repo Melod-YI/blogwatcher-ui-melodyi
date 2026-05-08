@@ -2,22 +2,22 @@
 
 ## What This Is
 
-A web-based reader UI for the existing blogwatcher CLI tool. It provides an Omnivore-style dark/light interface to browse, read, and manage blog articles tracked by blogwatcher. Single-user, self-hosted, accessed via browser on desktop or mobile.
+A web-based reader UI for the existing blogwatcher CLI tool with note-taking capabilities. It provides an Omnivore-style dark/light interface to browse, read, manage blog articles, and write Markdown notes. Single-user, self-hosted, accessed via browser on desktop or mobile.
 
 ## Core Value
 
 Read and manage blog articles through a clean, responsive web interface without touching the CLI.
 
-## Current Milestone: v1.4 Article Notes
+## Current Milestone: Planning Next Milestone
 
-**Goal:** 允许用户为文章编写备注，备注为 Markdown 文档，可在 UI 查看。
+**Status:** v1.4 Article Notes completed on 2026-05-08. Ready to plan next milestone.
 
-**Target features:**
-- CLI `note --article-id <id> --file <path>` 命令：写入备注（复制文件内容）
-- CLI `note delete --article-id <id>` 命令：删除备注
-- CLI `article list --not-noted` 筛选：未读且无备注的文章
-- 备注存储：Markdown 文件 (`~/.blogwatcher/notes/{article_id}.md`)
-- UI：仅在有备注的文章卡片上显示按钮，点击后新标签页打开渲染页面
+**Recent achievements (v1.4):**
+- CLI note 命令实现（写入/删除 Markdown 备注）
+- --not-noted 筛选参数（与 --unread 组合）
+- UI 备注 显示（Markdown 渲染 + GFM 支持）
+- 备注 文件存储（~/.blogwatcher/notes/{id}.md）
+- 数据库 has_note 字段标记
 
 ## Requirements
 
@@ -87,14 +87,24 @@ Shipped in v1.3:
 - ✓ **CLI-06**: go install 安装 — v1.3
 - ✓ **CLI-07**: serve 子命令启动 UI — v1.3
 
+Shipped in v1.4:
+
+- ✓ **NOTE-01**: CLI note --article-id --file 命令写入备注 — v1.4
+- ✓ **NOTE-02**: CLI note delete --article-id 命令删除备注 — v1.4
+- ✓ **NOTE-03**: 缺少必填参数时报错退出 — v1.4
+- ✓ **NOTE-04**: CLI article list --not-noted 筛选无备注文章 — v1.4
+- ✓ **NOTE-05**: --not-noted 可与 --unread 组合使用 — v1.4
+- ✓ **NOTE-06**: 备注文件存储于 ~/.blogwatcher/notes/{id}.md — v1.4
+- ✓ **NOTE-07**: articles 表新增 has_note 字段 — v1.4
+- ✓ **NOTE-08**: 写入/删除备注时同步更新 has_note — v1.4
+- ✓ **NOTE-09**: 有备注的文章卡片显示备注按钮 — v1.4
+- ✓ **NOTE-10**: 点击备注按钮新标签页打开 Markdown 渲染页面 — v1.4
+- ✓ **NOTE-11**: Markdown 渲染支持 GFM 格式 — v1.4
+- ✓ **NOTE-12**: 备注页面显示文章标题和原文链接 — v1.4
+
 ### Active
 
-- [ ] **NOTE-01**: CLI `note --article-id <id> --file <path>` 写入备注
-- [ ] **NOTE-02**: CLI `note delete --article-id <id>` 删除备注
-- [ ] **NOTE-03**: CLI `article list --not-noted` 筛选未读且无备注文章
-- [ ] **NOTE-04**: 备注文件存储于 `~/.blogwatcher/notes/{article_id}.md`
-- [ ] **NOTE-05**: UI 文章卡片显示备注按钮（仅在有备注时显示）
-- [ ] **NOTE-06**: UI 点击备注按钮新标签页打开 Markdown 渲染页面
+(None — ready for next milestone planning)
 
 ### Out of Scope
 
@@ -109,18 +119,27 @@ Shipped in v1.3:
 
 ## Context
 
+**Current state (v1.4 shipped 2026-05-08):**
+- Full CRUD for blog articles via UI and CLI
+- Note-taking system: CLI write/delete, UI Markdown display
+- Tech stack: Go server + HTMX + SQLite + Cobra CLI + Goldmark
+- Database: ~/.blogwatcher/blogwatcher.db + notes/{id}.md files
+- Total milestones: 4 (v1.0-v1.4), 62 requirements validated
+
 **Reference codebase:** `.reference/blogwatcher/` contains the Go CLI tool that:
 - Tracks blogs via RSS/Atom feeds or HTML scraping
 - Stores data in SQLite at `~/.blogwatcher/blogwatcher.db`
 - Has `blogs` table (id, name, url, feed_url, scrape_selector, last_scanned)
-- Has `articles` table (id, blog_id, title, url, published_date, discovered_date, is_read)
-- Provides scanning, read/unread management via CLI
+- Has `articles` table (id, blog_id, title, url, published_date, discovered_date, is_read, has_note)
+- Provides scanning, read/unread management, note management via CLI
 
 **Database location:** `~/.blogwatcher/blogwatcher.db` (shared with CLI)
 
+**Notes storage:** `~/.blogwatcher/notes/{article_id}.md` (Markdown files)
+
 **Existing patterns:** The reference code uses modernc.org/sqlite, clean Go patterns, tested storage layer.
 
-**v1.0 architecture:** Go server with HTMX, CSS custom properties for theming, scanner packages (RSS, scraper).
+**Architecture:** Go server with HTMX, CSS custom properties for theming, Cobra CLI framework, scanner packages (RSS, scraper), Goldmark Markdown renderer.
 
 ## Constraints
 
@@ -145,6 +164,15 @@ Shipped in v1.3:
 | Unified entry point (cmd/blogwatcher) | Single binary for UI and CLI, go install compatible | ✓ Good (v1.3) |
 | Output formatters as package | Separate internal/cli/output for table/json/simple formats | ✓ Good (v1.3) |
 
+| 顶层命令 note 结构 | ROADMAP 指定 'note --article-id' 风格，简单直接 | ✓ Good (v1.4) |
+| 必须验证文章存在 | 确保备注与实际文章关联，避免无效 ID | ✓ Good (v1.4) |
+| 静默覆盖已有备注 | 符合备注可能需要更新的使用场景，简单直接 | ✓ Good (v1.4) |
+| 自动创建 notes 目录 | 用户首次写入时自动创建，无需手动准备 | ✓ Good (v1.4) |
+| 报错提示删除不存在的备注 | 一致的用户体验，告知操作无效 | ✓ Good (v1.4) |
+| Goldmark + GFM 扩展 | 标准 Go Markdown 解析器，支持表格、删除线、任务列表 | ✓ Good (v1.4) |
+| 服务器端 Markdown 渲染 | 无需 JavaScript 增强，Go-native 方案 | ✓ Good (v1.4) |
+| CSS 变量系统适配主题 | 自动 Light/Dark 主题切换，一致性 | ✓ Good (v1.4) |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -163,4 +191,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-07 after v1.4 milestone start*
+*Last updated: 2026-05-08 after v1.4 milestone completion*

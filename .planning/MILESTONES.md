@@ -1,5 +1,15 @@
 # Milestones: BlogWatcher UI
 
+## v1.4 Article Notes (Shipped: 2026-05-08)
+
+**Phases completed:** 3 phases, 6 plans, 16 tasks
+
+**Key accomplishments:**
+
+- (none recorded)
+
+---
+
 ## v1.3 CLI System (Shipped: 2026-05-07)
 
 **Phases completed:** 3 phases, 6 plans, 0 tasks
