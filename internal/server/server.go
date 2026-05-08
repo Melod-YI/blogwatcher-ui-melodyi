@@ -34,9 +34,10 @@ func NewServer(db *storage.Database) (http.Handler, error) {
 func NewServerWithFS(db *storage.Database, templateFS fs.FS, staticFS fs.FS, version string) (http.Handler, error) {
 	// Register template functions BEFORE parsing templates
 	funcMap := template.FuncMap{
-		"timeAgo":    timeAgo,
-		"faviconURL": faviconURL,
-		"smryURL":    smryURL,
+		"timeAgo":       timeAgo,
+		"faviconURL":    faviconURL,
+		"smryURL":       smryURL,
+		"renderMarkdown": renderMarkdown,
 	}
 
 	// Parse all templates once at startup from embedded filesystem
