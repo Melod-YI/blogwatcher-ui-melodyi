@@ -6,11 +6,11 @@
 
 ## Milestones
 
-- ✅ **v1.0 MVP** - Phases 1-5 (shipped 2026-02-03)
-- ✅ **v1.1 UI Polish & Search** - Phases 6-8 (shipped 2026-02-03)
-- ✅ **v1.2 Blog Management** - Phases 9-11 (shipped 2026-02-09)
-- ✅ **v1.3 CLI System** - Phase 12 (shipped 2026-05-07)
-- 🔄 **v1.4 Article Notes** - Phases 13-15 (Phase 13 complete)
+- **v1.0 MVP** - Phases 1-5 (shipped 2026-02-03)
+- **v1.1 UI Polish & Search** - Phases 6-8 (shipped 2026-02-03)
+- **v1.2 Blog Management** - Phases 9-11 (shipped 2026-02-09)
+- **v1.3 CLI System** - Phase 12 (shipped 2026-05-07)
+- **v1.4 Article Notes** - Phases 13-15 (Phase 13 complete)
 
 ## Phases
 
@@ -331,7 +331,7 @@ Plans:
 ---
 
 <details>
-<summary>✅ v1.3 CLI System (Phase 12) - SHIPPED 2026-05-07</summary>
+<summary>v1.3 CLI System (Phase 12) - SHIPPED 2026-05-07</summary>
 
 **Milestone Goal:** 提供独立的 CLI 工具，可通过 `go install` 安装，完成扫描、列出文章、标记已读/未读等核心操作，共享 UI 项目数据库。
 
@@ -461,7 +461,10 @@ Plans:
 
 **Depends on:** Phase 14 (CLI Filtering Enhancement)
 
-**Plans:** 0 plans (not yet created)
+**Plans:** 1 plan
+
+Plans:
+- [ ] 15-01-PLAN.md — 文章卡片备注按钮 + 备注 页面 + Markdown 渲染（goldmark + GFM）
 
 ---
 
@@ -606,13 +609,13 @@ Plans:
 |-------|--------|----------|
 | 13 - CLI Notes Infrastructure | Complete | 100% (4/4) |
 | 14 - CLI Filtering Enhancement | Planned | 0% |
-| 15 - UI Note Display | Planned | 0% |
+| 15 - UI Note Display | Planned | 0% (1 plan) |
 
 **v1.0 Progress:** 5/5 phases complete (100%)
 **v1.1 Progress:** 3/3 phases complete (100%)
 **v1.2 Progress:** 3/3 phases complete (100%)
 **v1.3 Progress:** 1/1 phases complete (100%)
-**v1.4 Progress:** 1/3 phases complete (33%) — 4 plans complete
+**v1.4 Progress:** 1/3 phases complete (33%) — 5 plans complete
 **Overall Progress:** 13/15 phases complete (87%)
 
 ---
@@ -638,4 +641,5 @@ Plans:
 *Phase 12 planned: 2026-05-07*
 *v1.4 roadmap added: 2026-05-07*
 *Plan 13-03 complete: 2026-05-07*
-*Last updated: 2026-05-07*
+*Phase 15 planned: 2026-05-08*
+*Last updated: 2026-05-08*
