@@ -18,6 +18,7 @@ type Blog struct {
 	FeedURL        string
 	ScrapeSelector string
 	LastScanned    *time.Time
+	CategoryID     *int64 // 分类ID（nullable，指向 categories.id）
 }
 
 type Article struct {

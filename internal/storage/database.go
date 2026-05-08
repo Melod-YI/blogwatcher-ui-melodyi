@@ -120,6 +120,13 @@ func (db *Database) ensureMigrations() error {
 		}
 	}
 
+	// Add category_id column to blogs table if it doesn't exist
+	if !db.columnExists("blogs", "category_id") {
+		if _, err := db.conn.Exec(`ALTER TABLE blogs ADD COLUMN category_id INTEGER REFERENCES categories(id)`); err != nil {
+			return fmt.Errorf("failed to add category_id column to blogs: %w", err)
+		}
+	}
+
 	// Add thumbnail_url column if it doesn't exist
 	if !db.columnExists("articles", "thumbnail_url") {
 		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN thumbnail_url TEXT`); err != nil {
