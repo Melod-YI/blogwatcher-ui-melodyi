@@ -728,7 +728,11 @@ func (s *Server) handleNote(w http.ResponseWriter, r *http.Request) {
 		// File not found or unreadable - return empty content
 		// Template will show "备注内容为空" message
 		content = ""
-		log.Printf("Note file not found for article %d: %s", id, notePath)
+		if os.IsNotExist(err) {
+			log.Printf("Note file not found for article %d: %s", id, notePath)
+		} else {
+			log.Printf("Error reading note file for article %d: %v (path: %s)", id, err, notePath)
+		}
 	} else {
 		content = string(noteBytes)
 	}
