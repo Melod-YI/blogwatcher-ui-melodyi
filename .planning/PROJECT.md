@@ -8,16 +8,17 @@ A web-based reader UI for the existing blogwatcher CLI tool with note-taking cap
 
 Read and manage blog articles through a clean, responsive web interface without touching the CLI.
 
-## Current Milestone: Planning Next Milestone
+## Current Milestone: v1.5 Blog Management Enhancement
 
-**Status:** v1.4 Article Notes completed on 2026-05-08. Ready to plan next milestone.
+**Goal:** 增强博客管理体验，提供更灵活的配置、分类组织和预览能力。
 
-**Recent achievements (v1.4):**
-- CLI note 命令实现（写入/删除 Markdown 备注）
-- --not-noted 筛选参数（与 --unread 组合）
-- UI 备注 显示（Markdown 渲染 + GFM 支持）
-- 备注 文件存储（~/.blogwatcher/notes/{id}.md）
-- 数据库 has_note 字段标记
+**Target features:**
+- Blog 设置页面可查看和修改 Blog URL 和 Feed URL
+- 分类系统：blog 分类管理 + UI 分层展示 + CLI 分类过滤
+- 添加 Blog 预览：新增前可预览 feed 解析结果
+- 文章去重优化：改进去重机制，优雅跳过已存在文章
+
+**Status:** Planning started on 2026-05-08.
 
 ## Requirements
 
@@ -104,7 +105,7 @@ Shipped in v1.4:
 
 ### Active
 
-(None — ready for next milestone planning)
+(None — will be defined during requirements phase)
 
 ### Out of Scope
 
@@ -191,4 +192,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-08 after v1.4 milestone completion*
+*Last updated: 2026-05-08 after v1.5 milestone started*
