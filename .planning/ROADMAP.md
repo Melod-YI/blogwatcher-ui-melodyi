@@ -461,10 +461,10 @@ Plans:
 
 **Depends on:** Phase 14 (CLI Filtering Enhancement)
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 15-01-PLAN.md — 文章卡片备注按钮 + 备注 页面 + Markdown 渲染（goldmark + GFM）
+- [x] 15-01-PLAN.md — 文章卡片备注按钮 + 备注 页面 + Markdown 渲染（goldmark + GFM）
 
 ---
 
