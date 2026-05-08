@@ -74,12 +74,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (Empty — will be populated during roadmap creation) |
+| CATG-01 | 16 | Pending |
+| CATG-02 | 16 | Pending |
+| DEDUP-01 | 16 | Pending |
+| DEDUP-02 | 16 | Pending |
+| DEDUP-03 | 16 | Pending |
+| CATG-03 | 17 | Pending |
+| CATG-04 | 17 | Pending |
+| CATG-05 | 17 | Pending |
+| CATG-06 | 17 | Pending |
+| CATG-07 | 17 | Pending |
+| CATG-08 | 18 | Pending |
+| CATG-09 | 18 | Pending |
+| CATG-10 | 18 | Pending |
+| SETT-01 | 19 | Pending |
+| SETT-02 | 19 | Pending |
+| SETT-03 | 19 | Pending |
+| SETT-04 | 19 | Pending |
+| SETT-05 | 19 | Pending |
+| PREV-01 | 20 | Pending |
+| PREV-02 | 20 | Pending |
+| PREV-03 | 20 | Pending |
+| PREV-04 | 20 | Pending |
+| PREV-05 | 20 | Pending |
+| PREV-06 | 20 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24 ⚠️
+- Mapped to phases: 24
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-08*

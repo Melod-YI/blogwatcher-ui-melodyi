@@ -1,8 +1,9 @@
 # Roadmap: BlogWatcher UI
 
+**Milestone:** v1.5 Blog Management Enhancement
 **Created:** 2026-02-02
 **Depth:** standard
-**Total Phases:** 15
+**Total Phases:** 20
 
 ## Milestones
 
@@ -11,6 +12,7 @@
 - **v1.2 Blog Management** - Phases 9-11 (shipped 2026-02-09)
 - **v1.3 CLI System** - Phase 12 (shipped 2026-05-07)
 - **v1.4 Article Notes** - Phases 13-15 (shipped 2026-05-08)
+- **v1.5 Blog Management Enhancement** - Phases 16-20 (planning)
 
 ## Phases
 
@@ -466,6 +468,131 @@ Plans:
 
 ---
 
+## v1.5 Blog Management Enhancement (PLANNING)
+
+**Milestone Goal:** 增强博客管理体验，提供更灵活的配置、分类组织和预览能力。
+**Started:** 2026-05-08
+
+### Phase 16: Database Schema
+
+**Goal:** Schema 扩展支持分类和改进去重机制
+
+**Requirements:**
+- CATG-01: 数据库创建 categories 表（id, name, created_at）
+- CATG-02: 数据库添加 blog.category_id 字段（nullable, foreign key）
+- DEDUP-01: AddArticlesBulk 使用 INSERT OR IGNORE
+- DEDUP-02: 扫描时遇到重复 URL 静默跳过
+- DEDUP-03: 扫描结果统计跳过的文章数量
+
+**Success Criteria:**
+1. categories 表创建成功，包含 id, name, created_at 字段
+2. blogs 表添加 category_id 字段（nullable foreign key）
+3. AddArticlesBulk 遇到重复 URL 不报错，静默跳过
+4. ScanBlog 返回统计包含 skipped_count
+5. 数据库迁移向后兼容，现有数据不受影响
+
+**Depends on:** Phase 15 (UI Note Display)
+
+**Plans:** 0 plans
+
+---
+
+### Phase 17: Category Management UI
+
+**Goal:** 分类管理界面和 blog 分类选择
+
+**Requirements:**
+- CATG-03: 设置页面添加分类管理区
+- CATG-04: 用户可创建新分类（输入名称）
+- CATG-05: 用户可编辑分类名称（inline 编辑）
+- CATG-06: 用户可删除分类（删除时 blog.category_id 置空）
+- CATG-07: Blog 编辑时可选择分类（下拉选择）
+
+**Success Criteria:**
+1. 设置页面显示分类管理区（独立区域）
+2. 点击"新建分类"按钮，输入名称后立即保存
+3. 分类名称可 inline 编辑（点击名称直接编辑）
+4. 删除分类时，关联 blog 的 category_id 自动置空
+5. Blog 编辑行显示分类下拉选择框
+
+**Depends on:** Phase 16 (Database Schema)
+
+**Plans:** 0 plans
+
+---
+
+### Phase 18: Category Display & CLI
+
+**Goal:** Subscriptions 分类分层展示和 CLI 分类过滤
+
+**Requirements:**
+- CATG-08: Subscriptions 按分类分层展示
+- CATG-09: 未分类 blog 在 Subscriptions 顶层显示
+- CATG-10: CLI article list --category 过滤
+
+**Success Criteria:**
+1. Subscriptions 区域按分类分组显示 blog
+2. 未分类 blog 显示在顶层（无分类标签）
+3. 点击分类名称可展开/折叠该分类下的 blog
+4. CLI `article list --category <name>` 返回该分类下的所有文章
+5. CLI `article list --category tech --unread` 组合过滤生效
+
+**Depends on:** Phase 17 (Category Management UI)
+
+**Plans:** 0 plans
+
+---
+
+### Phase 19: Blog Settings Enhancement
+
+**Goal:** 设置页面可查看和编辑 Blog URL 和 Feed URL
+
+**Requirements:**
+- SETT-01: 设置页面显示 Blog URL 和 Feed URL
+- SETT-02: 设置页面可编辑 Blog URL（inline 编辑）
+- SETT-03: 设置页面可编辑 Feed URL（inline 编辑）
+- SETT-04: 编辑时验证 URL 格式（HTTP/HTTPS）
+- SETT-05: 保存后立即更新数据库
+
+**Success Criteria:**
+1. 设置页面 blog 行显示 Blog URL 和 Feed URL 列
+2. Blog URL 可 inline 编辑（点击 URL 直接编辑）
+3. Feed URL 可 inline 编辑（点击 URL 直接编辑）
+4. 输入非 HTTP/HTTPS URL 时显示错误提示
+5. 编辑保存后，数据库立即更新，无需刷新页面
+
+**Depends on:** Phase 18 (Category Display & CLI)
+
+**Plans:** 0 plans
+
+---
+
+### Phase 20: Blog Preview
+
+**Goal:** 新增 blog 前预览 feed 解析结果
+
+**Requirements:**
+- PREV-01: 添加 blog 表单有预览按钮
+- PREV-02: 点击预览触发临时 feed 解析
+- PREV-03: 预览页面显示解析的文章列表（最多 20 条）
+- PREV-04: 预览失败显示错误信息
+- PREV-05: 预览页面有保存按钮（保存为正式 blog）
+- PREV-06: 预览页面有返回修改按钮（返回添加表单）
+
+**Success Criteria:**
+1. 添加 blog 表单显示"预览"按钮（与"保存"并列）
+2. 点击预览后，页面跳转到临时预览页面
+3. 预览页面显示最多 20 篇解析的文章（标题、时间、链接）
+4. Feed URL 无效时，预览页面显示错误信息（如"无法解析 feed"）
+5. 预览页面显示"保存为 Blog"按钮，点击后保存并跳转到设置页面
+6. 预览页面显示"返回修改"按钮，点击后返回添加表单保留输入
+
+**Depends on:** Phase 19 (Blog Settings Enhancement)
+
+**Plans:** 0 plans
+
+---
+
 ## Coverage Validation
 
 ### v1.0 Requirements
@@ -565,6 +692,37 @@ Plans:
 
 **v1.4 Coverage:** 12/12 requirements mapped (100%)
 
+### v1.5 Requirements
+
+| Requirement | Phase | Covered |
+|-------------|-------|---------|
+| CATG-01 | 16 | Yes |
+| CATG-02 | 16 | Yes |
+| DEDUP-01 | 16 | Yes |
+| DEDUP-02 | 16 | Yes |
+| DEDUP-03 | 16 | Yes |
+| CATG-03 | 17 | Yes |
+| CATG-04 | 17 | Yes |
+| CATG-05 | 17 | Yes |
+| CATG-06 | 17 | Yes |
+| CATG-07 | 17 | Yes |
+| CATG-08 | 18 | Yes |
+| CATG-09 | 18 | Yes |
+| CATG-10 | 18 | Yes |
+| SETT-01 | 19 | Yes |
+| SETT-02 | 19 | Yes |
+| SETT-03 | 19 | Yes |
+| SETT-04 | 19 | Yes |
+| SETT-05 | 19 | Yes |
+| PREV-01 | 20 | Yes |
+| PREV-02 | 20 | Yes |
+| PREV-03 | 20 | Yes |
+| PREV-04 | 20 | Yes |
+| PREV-05 | 20 | Yes |
+| PREV-06 | 20 | Yes |
+
+**v1.5 Coverage:** 24/24 requirements mapped (100%)
+
 ---
 
 ## Phase Progress
@@ -614,7 +772,8 @@ Plans:
 **v1.2 Progress:** 3/3 phases complete (100%)
 **v1.3 Progress:** 1/1 phases complete (100%)
 **v1.4 Progress:** 3/3 phases complete (100%) — 6 plans complete
-**Overall Progress:** 15/15 phases complete (100%)
+**v1.5 Progress:** 0/5 phases complete (0%)
+**Overall Progress:** 15/20 phases complete (75%)
 
 ---
 
@@ -640,4 +799,5 @@ Plans:
 *v1.4 roadmap added: 2026-05-07*
 *Plan 13-03 complete: 2026-05-07*
 *Phase 15 planned: 2026-05-08*
+*v1.5 roadmap added: 2026-05-08*
 *Last updated: 2026-05-08*
