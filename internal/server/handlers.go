@@ -7,8 +7,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -686,4 +689,55 @@ func (s *Server) handleDeleteBlog(w http.ResponseWriter, r *http.Request) {
 
 	// Return empty response - HTMX will remove the blog card via outerHTML swap
 	w.WriteHeader(http.StatusOK)
+}
+
+// handleNote serves the note page for an article
+// Fetches article info from database and reads note content from file
+func (s *Server) handleNote(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch article from database
+	article, err := s.db.GetArticleByID(id)
+	if err != nil {
+		log.Printf("Error fetching article %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if article == nil {
+		http.Error(w, "Article not found", http.StatusNotFound)
+		return
+	}
+
+	// Read note content from file
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Error getting home directory: %v", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	notePath := filepath.Join(homeDir, ".blogwatcher", "notes", fmt.Sprintf("%d.md", id))
+
+	var content string
+	noteBytes, err := os.ReadFile(notePath)
+	if err != nil {
+		// File not found or unreadable - return empty content
+		// Template will show "备注内容为空" message
+		content = ""
+		log.Printf("Note file not found for article %d: %s", id, notePath)
+	} else {
+		content = string(noteBytes)
+	}
+
+	data := map[string]interface{}{
+		"ID":      id,
+		"Title":   article.Title,
+		"URL":     article.URL,
+		"Content": content,
+	}
+	s.renderTemplate(w, "note.gohtml", data)
 }
