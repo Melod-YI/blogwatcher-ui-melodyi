@@ -46,6 +46,7 @@ func NewListCmd() *cobra.Command {
 
 筛选参数：
   --blog <name>    按博客名称筛选
+  --category <name> 按分类名称筛选
   --unread         仅显示未读文章
   --read           仅显示已读文章
   --not-noted      仅显示无备注文章
@@ -61,6 +62,7 @@ func NewListCmd() *cobra.Command {
   blogwatcher article list --unread
   blogwatcher article list --not-noted
   blogwatcher article list --not-noted --unread
+  blogwatcher article list --category tech --unread
   blogwatcher article list --blog "Tech Blog" --unread --after 2026-01-01
   blogwatcher article list --format json`,
 		Run: runList,
@@ -68,6 +70,7 @@ func NewListCmd() *cobra.Command {
 
 	// 添加筛选 flags
 	cmd.Flags().String("blog", "", "博客名称筛选")
+	cmd.Flags().String("category", "", "分类名称筛选")
 	cmd.Flags().Bool("unread", false, "仅未读文章")
 	cmd.Flags().Bool("read", false, "仅已读文章")
 	cmd.Flags().Bool("not-noted", false, "仅无备注文章")
@@ -141,6 +144,7 @@ func runList(cmd *cobra.Command, args []string) {
 
 	// 解析筛选参数
 	blogName, _ := cmd.Flags().GetString("blog")
+	categoryName, _ := cmd.Flags().GetString("category")
 	unread, _ := cmd.Flags().GetBool("unread")
 	read, _ := cmd.Flags().GetBool("read")
 	notNoted, _ := cmd.Flags().GetBool("not-noted")
@@ -149,7 +153,8 @@ func runList(cmd *cobra.Command, args []string) {
 
 	// 构建筛选选项
 	opts := storage.ListFilterOptions{
-		BlogName: blogName,
+		BlogName:     blogName,
+		CategoryName: categoryName,
 	}
 
 	// 设置 IsRead 状态筛选
@@ -195,6 +200,20 @@ func runList(cmd *cobra.Command, args []string) {
 		}
 		if blog == nil {
 			fmt.Fprintf(os.Stderr, "博客 '%s' 不存在\n", blogName)
+			os.Exit(1)
+		}
+	}
+
+	// 检查分类名称是否存在（如果指定了）
+	if categoryName != "" && len(articles) == 0 {
+		// 验证分类是否存在
+		category, err := db.GetCategoryByName(categoryName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "查询分类失败: %v\n", err)
+			os.Exit(1)
+		}
+		if category == nil {
+			fmt.Fprintf(os.Stderr, "分类 '%s' 不存在\n", categoryName)
 			os.Exit(1)
 		}
 	}
