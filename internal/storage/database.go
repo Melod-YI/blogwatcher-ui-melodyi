@@ -662,6 +662,12 @@ func (db *Database) GetBlogByName(name string) (*model.Blog, error) {
 	return scanBlog(row)
 }
 
+// GetCategoryByName returns a category by its name, or nil if not found.
+func (db *Database) GetCategoryByName(name string) (*model.Category, error) {
+	row := db.conn.QueryRow(`SELECT id, name, created_at FROM categories WHERE name = ?`, name)
+	return scanCategory(row)
+}
+
 // GetBlogByID returns a blog by its ID, or nil if not found.
 func (db *Database) GetBlogByID(id int64) (*model.Blog, error) {
 	row := db.conn.QueryRow(`SELECT id, name, url, feed_url, scrape_selector, last_scanned, category_id FROM blogs WHERE id = ?`, id)
@@ -963,6 +969,32 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 	return article, nil
 }
 
+// scanCategory scans a category row from the database.
+func scanCategory(scanner interface{ Scan(dest ...any) error }) (*model.Category, error) {
+	var (
+		id        int64
+		name      string
+		createdAt sql.NullString
+	)
+	if err := scanner.Scan(&id, &name, &createdAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	category := &model.Category{
+		ID:   id,
+		Name: name,
+	}
+	if createdAt.Valid {
+		if parsed, err := parseTime(createdAt.String); err == nil {
+			category.CreatedAt = parsed
+		}
+	}
+	return category, nil
+}
+
 func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.ArticleWithBlog, error) {
 	var (
 		id            int64
@@ -1130,17 +1162,18 @@ func (db *Database) UpdateArticleThumbnail(id int64, thumbnailURL string) error 
 }
 
 // ListFilterOptions 筛选文章的选项参数
-// 用于 CLI article list 命令，支持按博客名称、已读状态、备注状态、日期筛选
+// 用于 CLI article list 命令，支持按博客名称、分类名称、已读状态、备注状态、日期筛选
 type ListFilterOptions struct {
-	BlogName  string     // 博客名称筛选（空表示所有博客）
-	IsRead    *bool      // 已读状态筛选（nil 表示所有状态）
-	HasNote   *bool      // 备注状态筛选（nil 表示所有状态，false 表示无备注）
-	AfterDate *time.Time // 日期筛选（nil 表示无限制）
-	Limit     int        // 结果数量限制（0 表示无限制）
+	BlogName     string     // 博客名称筛选（空表示所有博客）
+	CategoryName string     // 分类名称筛选（空表示所有分类）
+	IsRead       *bool      // 已读状态筛选（nil 表示所有状态）
+	HasNote      *bool      // 备注状态筛选（nil 表示所有状态，false 表示无备注）
+	AfterDate    *time.Time // 日期筛选（nil 表示无限制）
+	Limit        int        // 结果数量限制（0 表示无限制）
 }
 
 // ListArticlesWithFilters 根据筛选选项列出文章（带博客信息）
-// 支持按博客名称、已读状态、日期筛选，用于 CLI article list 命令
+// 支持按博客名称、分类名称、已读状态、日期筛选，用于 CLI article list 命令
 func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.ArticleWithBlog, error) {
 	// 构建基础查询
 	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url
@@ -1155,6 +1188,12 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 	if opts.BlogName != "" {
 		conditions = append(conditions, "a.blog_id = (SELECT id FROM blogs WHERE name = ?)")
 		args = append(args, opts.BlogName)
+	}
+
+	// 分类名称筛选（通过子查询获取 category_id）
+	if opts.CategoryName != "" {
+		conditions = append(conditions, "b.category_id = (SELECT id FROM categories WHERE name = ?)")
+		args = append(args, opts.CategoryName)
 	}
 
 	// 已读状态筛选
