@@ -182,6 +182,35 @@ func (s *Server) handleBlogList(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleBlogListGrouped serves the blog list grouped by category
+// Returns partial fragment for HTMX requests
+func (s *Server) handleBlogListGrouped(w http.ResponseWriter, r *http.Request) {
+	// 获取当前选中的 blog ID（从 query 参数）
+	currentBlogIDStr := r.URL.Query().Get("blog")
+	var currentBlogID int64
+	if currentBlogIDStr != "" {
+		id, err := strconv.ParseInt(currentBlogIDStr, 10, 64)
+		if err == nil {
+			currentBlogID = id
+		}
+	}
+
+	// 获取分组数据
+	grouped, err := s.db.ListBlogsGroupedByCategory(currentBlogID)
+	if err != nil {
+		log.Printf("Error fetching grouped blogs: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Grouped": grouped,
+	}
+
+	// 返回 partial fragment
+	s.renderTemplate(w, "category-group.gohtml", data)
+}
+
 // handleMarkRead marks an article as read and returns empty response for HTMX swap
 func (s *Server) handleMarkRead(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
