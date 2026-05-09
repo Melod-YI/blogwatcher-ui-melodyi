@@ -10,6 +10,24 @@
                    placeholder="Blog name">
         </div>
 
+        <!-- Blog URL -->
+        <div class="blog-edit-url">
+            <label class="edit-label">Blog URL</label>
+            <input type="url" name="url" value="{{.Blog.URL}}"
+                   pattern="^https?://.*"
+                   placeholder="https://example.com">
+            <span class="url-error-message">URL 必须以 http:// 或 https:// 开头</span>
+        </div>
+
+        <!-- Feed URL -->
+        <div class="blog-edit-feed-url">
+            <label class="edit-label">Feed URL</label>
+            <input type="url" name="feed_url" value="{{.Blog.FeedURL}}"
+                   pattern="^https?://.*"
+                   placeholder="https://example.com/feed.xml">
+            <span class="url-error-message">URL 必须以 http:// 或 https:// 开头</span>
+        </div>
+
         <!-- Category dropdown (refreshes when new categories are created) -->
         <div class="blog-edit-category">
             <select name="category_id"
