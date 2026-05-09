@@ -351,6 +351,20 @@ type CategoryWithBlogCount struct {
 	BlogCount int
 }
 
+// CategoryWithBlogs extends CategoryWithBlogCount with blog list for sidebar grouping.
+type CategoryWithBlogs struct {
+	model.Category
+	BlogCount int
+	Blogs     []BlogWithCount
+}
+
+// GroupedSidebarData holds data for category-grouped sidebar rendering.
+type GroupedSidebarData struct {
+	Categories    []CategoryWithBlogs // blog_count > 0, sorted alphabetically
+	Uncategorized []BlogWithCount     // category_id = NULL, sorted alphabetically
+	CurrentBlogID int64               // 当前选中的 blog ID（用于 active 状态）
+}
+
 // ListBlogsWithCounts returns all blogs with their article counts.
 // Uses LEFT JOIN to include blogs with zero articles.
 func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
@@ -1325,6 +1339,57 @@ func (db *Database) ListCategoriesWithBlogCount() ([]CategoryWithBlogCount, erro
 		categories = append(categories, category)
 	}
 	return categories, rows.Err()
+}
+
+// ListBlogsGroupedByCategory returns blogs grouped by category for sidebar rendering.
+// Categories with blog_count > 0 first, uncategorized blogs at the end.
+// Both groups are sorted alphabetically by name.
+func (db *Database) ListBlogsGroupedByCategory(currentBlogID int64) (GroupedSidebarData, error) {
+	// 1. 获取分类 + blog count
+	categories, err := db.ListCategoriesWithBlogCount()
+	if err != nil {
+		return GroupedSidebarData{}, err
+	}
+
+	// 2. 获取所有 blogs + category_id
+	blogs, err := db.ListBlogsWithCounts()
+	if err != nil {
+		return GroupedSidebarData{}, err
+	}
+
+	// 3. 分组逻辑
+	var grouped []CategoryWithBlogs
+	var uncategorized []BlogWithCount
+
+	// 按分类分组（Per D-03: 空分类不显示）
+	for _, cat := range categories {
+		if cat.BlogCount > 0 {
+			var catBlogs []BlogWithCount
+			for _, blog := range blogs {
+				if blog.CategoryID != nil && *blog.CategoryID == cat.ID {
+					catBlogs = append(catBlogs, blog)
+				}
+			}
+			grouped = append(grouped, CategoryWithBlogs{
+				Category:  cat.Category,
+				BlogCount: cat.BlogCount,
+				Blogs:     catBlogs,
+			})
+		}
+	}
+
+	// 未分类 blogs (category_id = NULL)
+	for _, blog := range blogs {
+		if blog.CategoryID == nil {
+			uncategorized = append(uncategorized, blog)
+		}
+	}
+
+	return GroupedSidebarData{
+		Categories:    grouped,
+		Uncategorized: uncategorized,
+		CurrentBlogID: currentBlogID,
+	}, nil
 }
 
 // UpdateCategoryName updates the name of a category by ID.
