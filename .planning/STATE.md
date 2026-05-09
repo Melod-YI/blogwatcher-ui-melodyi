@@ -3,24 +3,24 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Blog Management Enhancement
 current_phase: 18
-status: executing
-stopped_at: Plan 18-01 complete
-last_updated: "2026-05-09T06:30:00.000Z"
-last_activity: 2026-05-09 -- Plan 18-01: CLI --category filtering complete
+status: complete
+stopped_at: Phase 18 complete
+last_updated: "2026-05-09T07:15:00.000Z"
+last_activity: 2026-05-09 -- Phase 18 complete (CATG-08, CATG-09, CATG-10)
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State: BlogWatcher UI
 
 **Last updated:** 2026-05-09
 **Current milestone:** v1.5 Blog Management Enhancement
-**Current phase:** 18
-**Overall progress:** 50% (4/8 plans complete in milestone)
+**Current phase:** 18 COMPLETE
+**Overall progress:** 100% (8/8 plans complete in milestone)
 
 ## Project Reference
 
@@ -36,20 +36,20 @@ See: .planning/PROJECT.md (updated 2026-05-08)
 | v1.1 | Complete | 15/15 | 3/3 |
 | v1.2 | Complete | 13/13 | 3/3 |
 | v1.4 | Complete | 12/12 | 4/4 plans |
-| v1.5 | Active | -- | 1/3 plans |
+| v1.5 | Complete | 10/10 | 3/3 plans |
 
 ## Current Position
 
-Phase: 18 (category-display-cli) — EXECUTING
-Plan: 18-01 complete (CLI --category filtering)
-Status: Ready for next plan (18-02: UI分类分组展示)
-Last activity: 2026-05-09 -- Plan 18-01: CLI --category filtering complete
+Phase: 18 (category-display-cli) — COMPLETE
+All plans: 18-01, 18-02, 18-03 complete
+Status: All requirements verified (CATG-08, CATG-09, CATG-10)
+Last activity: 2026-05-09 -- Phase 18 complete
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 31 (10 from v1.0 + 5 from v1.1 + 6 from v1.2)
+- Total plans completed: 38 (10 from v1.0 + 5 from v1.1 + 6 from v1.2 + 7 from v1.4 + 3 from v1.5)
 - Average duration: ~3-5 min per plan
 - Total execution time: (tracked during execution)
 
@@ -68,6 +68,9 @@ Last activity: 2026-05-09 -- Plan 18-01: CLI --category filtering complete
 | 9 - Settings Page Foundation | 1 | Complete |
 | 10 - Add Blog Flow | 2 | Complete |
 | 11 - Edit and Remove Blogs | 3 | Complete |
+| 16 - Database Schema | 2 | Complete |
+| 17 - Category Management UI | 2 | Complete |
+| 18 - Category Display & CLI | 3 | Complete |
 
 *Updated after each plan completion*
 
@@ -91,6 +94,11 @@ Recent decisions affecting current work:
 - Phase 9: Self-contained page templates to avoid Go template block conflicts
 - Plan 13-02A: HasNote field placement follows query field order (Article after IsRead, ArticleWithBlog after BlogURL)
 - Plan 13-02B: Scan parameter order matches SELECT query field order for consistency
+- Phase 18: Categories first, uncategorized at the end with separator (D-01, D-02)
+- Phase 18: Empty categories not displayed (D-03)
+- Phase 18: localStorage key 'sidebar-category-expand-state' for collapse persistence (D-04)
+- Phase 18: Default all expanded, only apply collapse if saved state exists (D-05)
+- Phase 18: CLI --category uses category name not ID (D-06)
 
 Full decision log in PROJECT.md Key Decisions table.
 
@@ -100,12 +108,7 @@ None.
 
 ### Known Blockers/Concerns
 
-**v1.2 dependencies:**
-
-- blogwatcher CLI must be installed and in PATH for shell exec
-- CLI `add` command handles feed auto-discovery
-- Phase 10 requires os/exec integration to call CLI commands
-- Phase 10 auto-sync must trigger UI's existing sync handler (with thumbnail extraction)
+None.
 
 ### Technical Notes
 
@@ -113,8 +116,9 @@ None.
 
 **Schema (v1.0):**
 
-- `blogs` table: id, name, url, feed_url, scrape_selector, last_scanned
+- `blogs` table: id, name, url, feed_url, scrape_selector, last_scanned, category_id
 - `articles` table: id, blog_id, title, url, published_date, discovered_date, is_read
+- `categories` table: id, name, created_at
 
 **Schema changes (v1.1):**
 
@@ -126,12 +130,20 @@ None.
 
 - [DONE] `articles.blog_id` made nullable (for future orphan article support)
 
-**New in v1.2:**
+**Schema changes (v1.4/v1.5):**
+
+- [DONE] `blogs.category_id` column (nullable INTEGER, FK to categories)
+- [DONE] `categories` table: id, name, created_at
+
+**New methods:**
 
 - [DONE] ListBlogsWithCounts() method with LEFT JOIN + GROUP BY
-- [DONE] BlogWithCount struct embedding model.Blog with ArticleCount
+- [DONE] BlogWithCount struct embedding model.Blog with ArticleCount, CategoryID
 - [DONE] GetBlogByID(), UpdateBlogName(), GetArticleCountForBlog() methods
 - [DONE] DeleteBlogWithArticles() method for cascade delete
+- [DONE] GetCategoryByName(), ListCategoriesWithBlogCount() methods
+- [DONE] ListBlogsGroupedByCategory() method for sidebar grouping
+- [DONE] GroupedSidebarData struct for category-grouped rendering
 
 **Tech stack:** Go server, Go templates, HTMX 2.0.4, SQLite (modernc.org/sqlite), CSS custom properties, gofeed, goquery
 
@@ -176,17 +188,20 @@ None.
 | 2026-02-09 | v1.2 COMPLETE | All 13 requirements delivered |
 | 2026-05-07 | Plan 13-02A complete | Article 和 ArticleWithBlog 模型添加 HasNote 字段 |
 | 2026-05-07 | Plan 13-03 complete | note 命令实现（写入和删除备注文件） |
+| 2026-05-09 | Phase 16 complete | Database schema for categories |
+| 2026-05-09 | Phase 17 complete | Category management UI (add, delete, assign) |
 | 2026-05-09 | Plan 18-01 complete | CLI article list --category 过滤实现（CATG-10） |
+| 2026-05-09 | Plan 18-02 complete | UI分类分组展示（CATG-08, CATG-09） |
+| 2026-05-09 | Plan 18-03 complete | localStorage 折叠状态持久化（CATG-08） |
+| 2026-05-09 | Phase 18 COMPLETE | All 3 plans verified (CATG-08, CATG-09, CATG-10) |
 
 ## Session Continuity
 
-Last session: 2026-05-09T06:30:00.000Z
-Stopped at: Plan 18-01 complete
-Resume file: .planning/phases/18-category-display-cli/18-02-PLAN.md
-Next action: Execute Plan 18-02 (UI分类分组展示)
+Last session: 2026-05-09T07:15:00.000Z
+Stopped at: Phase 18 complete
+Next action: Milestone v1.5 complete - ready for next milestone planning
 
 ---
-
 *State initialized: 2026-02-02*
 *v1.1 roadmap added: 2026-02-03*
 *v1.2 milestone started: 2026-02-08*
@@ -196,3 +211,4 @@ Next action: Execute Plan 18-02 (UI分类分组展示)
 *Phase 11 complete: 2026-02-09*
 *v1.2 COMPLETE: 2026-02-09*
 *Plan 13-02A complete: 2026-05-07*
+*Phase 18 complete: 2026-05-09*
