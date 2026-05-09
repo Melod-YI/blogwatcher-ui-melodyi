@@ -520,12 +520,12 @@ Plans:
 
 **Depends on:** Phase 16 (Database Schema)
 
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 17-01-PLAN.md — 数据库方法实现（CreateCategory, ListCategoriesWithBlogCount, UpdateCategoryName, DeleteCategory, UpdateBlogCategory）
-- [ ] 17-02-PLAN.md — 分类 Handler 和 Templates（handleCategoriesNew/Create/Edit/Update/Delete, category-section/item/edit-form/add-form/delete-dialog templates）
-- [ ] 17-03-PLAN.md — Blog 分类选择集成（settings-page + blog-edit-form 扩展）
+- [x] 17-02-PLAN.md — 分类 Handler 和 Templates（handleCategoriesNew/Create/Edit/Update/Delete, category-section/item/edit-form/add-form/delete-dialog templates）
+- [x] 17-03-PLAN.md — Blog 分类选择集成（settings-page + blog-edit-form 扩展）
 
 ---
 
