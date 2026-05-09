@@ -19,6 +19,7 @@ import (
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/scanner"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/service"
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/storage"
 )
 
 // renderTemplate executes a named template with the given data.
@@ -688,6 +689,195 @@ func (s *Server) handleDeleteBlog(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Trigger", "blogListUpdated")
 
 	// Return empty response - HTMX will remove the blog card via outerHTML swap
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleCategoriesList returns all categories with blog counts for HTMX list refresh
+func (s *Server) handleCategoriesList(w http.ResponseWriter, r *http.Request) {
+	categories, err := s.db.ListCategoriesWithBlogCount()
+	if err != nil {
+		log.Printf("Error fetching categories: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Categories": categories,
+	}
+	s.renderTemplate(w, "category-list.gohtml", data)
+}
+
+// handleGetCategory returns a single category item for HTMX swap (used by cancel button)
+func (s *Server) handleGetCategory(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		return
+	}
+
+	categories, err := s.db.ListCategoriesWithBlogCount()
+	if err != nil {
+		log.Printf("Error fetching categories: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	var found *storage.CategoryWithBlogCount
+	for _, c := range categories {
+		if c.ID == id {
+			found = &c
+			break
+		}
+	}
+	if found == nil {
+		http.Error(w, "Category not found", http.StatusNotFound)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Category":  found,
+		"BlogCount": found.BlogCount,
+	}
+	s.renderTemplate(w, "category-item.gohtml", data)
+}
+
+// handleCategoriesNew returns the add category form partial for HTMX swap
+func (s *Server) handleCategoriesNew(w http.ResponseWriter, r *http.Request) {
+	s.renderTemplate(w, "category-add-form.gohtml", nil)
+}
+
+// handleCategoriesCreate creates a new category and returns the category item partial
+func (s *Server) handleCategoriesCreate(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" {
+		http.Error(w, "Category name required", http.StatusBadRequest)
+		return
+	}
+
+	category, err := s.db.CreateCategory(name)
+	if err != nil {
+		log.Printf("Error creating category: %v", err)
+		http.Error(w, "Failed to create category", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Created category '%s' (id=%d)", category.Name, category.ID)
+
+	data := map[string]interface{}{
+		"Category":  category,
+		"BlogCount": 0,
+	}
+	w.Header().Set("HX-Trigger", "categoryListUpdated")
+	s.renderTemplate(w, "category-item.gohtml", data)
+}
+
+// handleCategoryEdit returns the category edit form partial for HTMX swap
+func (s *Server) handleCategoryEdit(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		return
+	}
+
+	categories, err := s.db.ListCategoriesWithBlogCount()
+	if err != nil {
+		log.Printf("Error fetching categories: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	var found *storage.CategoryWithBlogCount
+	for _, c := range categories {
+		if c.ID == id {
+			found = &c
+			break
+		}
+	}
+	if found == nil {
+		http.Error(w, "Category not found", http.StatusNotFound)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Category":  found,
+		"BlogCount": found.BlogCount,
+	}
+	s.renderTemplate(w, "category-edit-form.gohtml", data)
+}
+
+// handleCategoryUpdate updates a category name and returns the category item partial
+func (s *Server) handleCategoryUpdate(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" {
+		http.Error(w, "Category name required", http.StatusBadRequest)
+		return
+	}
+
+	err = s.db.UpdateCategoryName(id, name)
+	if err != nil {
+		log.Printf("Error updating category %d: %v", id, err)
+		http.Error(w, "Failed to update category", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Updated category %d name to '%s'", id, name)
+
+	// Get updated category with blog count
+	categories, err := s.db.ListCategoriesWithBlogCount()
+	if err != nil {
+		log.Printf("Error fetching categories: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	var found *storage.CategoryWithBlogCount
+	for _, c := range categories {
+		if c.ID == id {
+			found = &c
+			break
+		}
+	}
+	if found == nil {
+		http.Error(w, "Category not found", http.StatusNotFound)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Category":  found,
+		"BlogCount": found.BlogCount,
+	}
+	w.Header().Set("HX-Trigger", "categoryListUpdated")
+	s.renderTemplate(w, "category-item.gohtml", data)
+}
+
+// handleCategoryDelete deletes a category and returns empty response for HTMX swap
+func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		return
+	}
+
+	err = s.db.DeleteCategory(id)
+	if err != nil {
+		log.Printf("Error deleting category %d: %v", id, err)
+		http.Error(w, "Failed to delete category", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Deleted category %d", id)
+
+	w.Header().Set("HX-Trigger", "categoryListUpdated, blogListUpdated")
 	w.WriteHeader(http.StatusOK)
 }
 

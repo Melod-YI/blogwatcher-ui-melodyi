@@ -1,0 +1,24 @@
+{{define "delete-category-dialog.gohtml"}}
+<dialog id="delete-category-{{.Category.ID}}" class="delete-category-dialog">
+    <h2>Delete Category?</h2>
+    <p class="category-name">{{.Category.Name}}</p>
+    <p class="blog-count-warning">
+        This category has <strong>{{.BlogCount}} blog(s)</strong>.
+        Deleting it will set these blogs to "Uncategorized".
+    </p>
+    <p class="warning-text">This action cannot be undone.</p>
+    <div class="dialog-buttons">
+        <button type="button" class="btn-action btn-danger"
+                hx-delete="/categories/{{.Category.ID}}"
+                hx-target="#category-{{.Category.ID}}"
+                hx-swap="outerHTML"
+                onclick="this.closest('dialog').close()">
+            Delete
+        </button>
+        <button type="button" class="btn-action btn-secondary"
+                onclick="this.closest('dialog').close()">
+            Cancel
+        </button>
+    </div>
+</dialog>
+{{end}}

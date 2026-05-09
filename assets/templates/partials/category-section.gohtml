@@ -1,0 +1,27 @@
+{{define "category-section.gohtml"}}
+<section class="settings-section category-section" id="category-section">
+    <h2>Categories</h2>
+
+    <!-- Category list -->
+    <div class="category-list" id="category-list"
+         hx-trigger="categoryListUpdated from:body"
+         hx-get="/categories/list"
+         hx-swap="innerHTML">
+        {{if .Categories}}
+        {{range .Categories}}
+        {{template "category-item.gohtml" .}}
+        {{end}}
+        {{else}}
+        <p class="empty-state">No categories yet.</p>
+        {{end}}
+    </div>
+
+    <!-- Add category button -->
+    <button type="button" class="btn-action btn-add-category"
+            hx-get="/categories/new"
+            hx-target="#category-list"
+            hx-swap="beforeend">
+        + New Category
+    </button>
+</section>
+{{end}}

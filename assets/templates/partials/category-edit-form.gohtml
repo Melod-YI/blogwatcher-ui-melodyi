@@ -1,0 +1,23 @@
+{{define "category-edit-form.gohtml"}}
+<div class="category-item category-edit-mode" id="category-{{.Category.ID}}">
+    <form class="category-edit-form"
+          hx-put="/categories/{{.Category.ID}}"
+          hx-target="#category-{{.Category.ID}}"
+          hx-swap="outerHTML">
+        <div class="category-edit-input">
+            <input type="text" name="name" value="{{.Category.Name}}"
+                   maxlength="100" required autofocus
+                   placeholder="Category name">
+        </div>
+        <div class="category-edit-actions">
+            <button type="submit" class="btn-action btn-save">Save</button>
+            <button type="button" class="btn-action btn-cancel"
+                    hx-get="/categories/{{.Category.ID}}"
+                    hx-target="#category-{{.Category.ID}}"
+                    hx-swap="outerHTML">
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>
+{{end}}

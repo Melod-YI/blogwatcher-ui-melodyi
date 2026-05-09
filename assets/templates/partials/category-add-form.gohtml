@@ -1,0 +1,23 @@
+{{define "category-add-form.gohtml"}}
+<div class="category-item category-add-mode">
+    <form class="category-add-form"
+          hx-post="/categories"
+          hx-target="this"
+          hx-swap="outerHTML">
+        <div class="category-edit-input">
+            <input type="text" name="name"
+                   maxlength="100" required autofocus
+                   placeholder="Category name">
+        </div>
+        <div class="category-edit-actions">
+            <button type="submit" class="btn-action btn-save">Save</button>
+            <button type="button" class="btn-action btn-cancel"
+                    hx-get="/categories/list"
+                    hx-target="this"
+                    hx-swap="outerHTML">
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>
+{{end}}

@@ -1,0 +1,8 @@
+{{define "category-list.gohtml"}}
+{{if .Categories}}
+{{range .Categories}}
+{{template "category-item.gohtml" .}}
+{{end}}
+{{else}}
+<p class="empty-state">No categories yet.</p>
+{{end}}

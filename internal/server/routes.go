@@ -33,4 +33,13 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /blogs/{id}/edit", s.handleEditBlog)
 	s.mux.HandleFunc("PUT /blogs/{id}", s.handleUpdateBlogName)
 	s.mux.HandleFunc("DELETE /blogs/{id}", s.handleDeleteBlog)
+
+	// Category management
+	s.mux.HandleFunc("GET /categories/new", s.handleCategoriesNew)
+	s.mux.HandleFunc("GET /categories/list", s.handleCategoriesList)
+	s.mux.HandleFunc("GET /categories/{id}", s.handleGetCategory)
+	s.mux.HandleFunc("POST /categories", s.handleCategoriesCreate)
+	s.mux.HandleFunc("GET /categories/{id}/edit", s.handleCategoryEdit)
+	s.mux.HandleFunc("PUT /categories/{id}", s.handleCategoryUpdate)
+	s.mux.HandleFunc("DELETE /categories/{id}", s.handleCategoryDelete)
 }

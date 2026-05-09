@@ -1,0 +1,44 @@
+{{define "category-item.gohtml"}}
+<div class="category-item" id="category-{{.Category.ID}}">
+    <div class="category-info">
+        <!-- Clickable category name for inline edit -->
+        <span class="category-name"
+              hx-get="/categories/{{.Category.ID}}/edit"
+              hx-target="#category-{{.Category.ID}}"
+              hx-swap="outerHTML">
+            {{.Category.Name}}
+        </span>
+        <span class="category-count">({{.BlogCount}} blogs)</span>
+    </div>
+    <div class="category-actions">
+        <button type="button" class="btn-action btn-danger"
+                onclick="document.getElementById('delete-category-{{.Category.ID}}').showModal()">
+            Delete
+        </button>
+    </div>
+
+    <!-- Embedded delete confirmation dialog -->
+    <dialog id="delete-category-{{.Category.ID}}" class="delete-category-dialog">
+        <h2>Delete Category?</h2>
+        <p class="category-name">{{.Category.Name}}</p>
+        <p class="blog-count-warning">
+            This category has <strong>{{.BlogCount}} blog(s)</strong>.
+            Deleting it will set these blogs to "Uncategorized".
+        </p>
+        <p class="warning-text">This action cannot be undone.</p>
+        <div class="dialog-buttons">
+            <button type="button" class="btn-action btn-danger"
+                    hx-delete="/categories/{{.Category.ID}}"
+                    hx-target="#category-{{.Category.ID}}"
+                    hx-swap="outerHTML"
+                    onclick="this.closest('dialog').close()">
+                Delete
+            </button>
+            <button type="button" class="btn-action btn-secondary"
+                    onclick="this.closest('dialog').close()">
+                Cancel
+            </button>
+        </div>
+    </dialog>
+</div>
+{{end}}
