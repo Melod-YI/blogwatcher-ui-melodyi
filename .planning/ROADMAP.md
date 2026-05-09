@@ -547,7 +547,12 @@ Plans:
 
 **Depends on:** Phase 17 (Category Management UI)
 
-**Plans:** 0 plans
+**Plans:** 3 plans
+
+Plans:
+- [ ] 18-01-PLAN.md — CLI --category 过滤实现
+- [ ] 18-02-PLAN.md — UI 分类分组展示
+- [ ] 18-03-PLAN.md — 样式和 localStorage 持久化
 
 ---
 
@@ -571,7 +576,12 @@ Plans:
 
 **Depends on:** Phase 18 (Category Display & CLI)
 
-**Plans:** 0 plans
+**Plans:** 3 plans
+
+Plans:
+- [ ] 18-01-PLAN.md — CLI --category 过滤实现
+- [ ] 18-02-PLAN.md — UI 分类分组展示
+- [ ] 18-03-PLAN.md — 样式和 localStorage 持久化
 
 ---
 
@@ -597,7 +607,12 @@ Plans:
 
 **Depends on:** Phase 19 (Blog Settings Enhancement)
 
-**Plans:** 0 plans
+**Plans:** 3 plans
+
+Plans:
+- [ ] 18-01-PLAN.md — CLI --category 过滤实现
+- [ ] 18-02-PLAN.md — UI 分类分组展示
+- [ ] 18-03-PLAN.md — 样式和 localStorage 持久化
 
 ---
 
