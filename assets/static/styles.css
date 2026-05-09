@@ -1826,3 +1826,98 @@ html:has(#theme-dark:checked) .action-btn-summarize {
     font-size: 1.5rem;
   }
 }
+
+/* ============================================
+   Category Grouping Styles (Phase 18)
+   ============================================ */
+
+/* 新增 muted 文本颜色变量 */
+:root {
+  --text-muted: #9ca3af;
+}
+
+html.dark {
+  --text-muted: #6b7280;
+}
+
+/* 分类分组容器 */
+.category-group {
+  margin-bottom: 8px;
+}
+
+/* 分类标题 */
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  transition: background-color 0.25s ease, color 0.25s ease;
+  margin-bottom: 8px;
+}
+
+.category-header:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.category-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Chevron 旋转 */
+.category-header .chevron-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
+.category-header.collapsed .chevron-icon {
+  transform: rotate(-90deg);
+}
+
+/* 分类计数 */
+.category-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* 分类内 blog 列表 */
+.category-blogs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+  overflow: hidden;
+  max-height: 500px;
+  transition: max-height 0.25s ease, opacity 0.15s ease;
+}
+
+.category-group.collapsed .category-blogs {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* 未分类分隔区 */
+.uncategorized-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.uncategorized-header {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
