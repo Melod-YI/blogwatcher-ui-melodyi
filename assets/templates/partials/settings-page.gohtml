@@ -7,6 +7,9 @@
 <div class="main-content-body">
     {{template "add-blog-form.gohtml" .}}
 
+    <!-- Category management section (shown before Tracked Blogs per D-01) -->
+    {{template "category-section.gohtml" .}}
+
     <section class="settings-section">
         <h2>Tracked Blogs</h2>
         {{if .SettingsBlogs}}
