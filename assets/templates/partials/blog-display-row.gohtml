@@ -2,8 +2,22 @@
 <div class="blog-settings-card" id="blog-{{.Blog.ID}}">
     <div class="blog-settings-info">
         <h3 class="blog-settings-name">{{.Blog.Name}}</h3>
-        <a href="{{.Blog.URL}}" target="_blank" rel="noopener noreferrer"
-           class="blog-settings-url">{{.Blog.URL}}</a>
+        <div class="blog-settings-url-row">
+            <div class="blog-url-column">
+                <span class="url-label">Blog URL</span>
+                <a href="{{.Blog.URL}}" target="_blank" rel="noopener noreferrer"
+                   class="blog-settings-url">{{.Blog.URL}}</a>
+            </div>
+            <div class="blog-url-column">
+                <span class="url-label">Feed URL</span>
+                {{if .Blog.FeedURL}}
+                <a href="{{.Blog.FeedURL}}" target="_blank" rel="noopener noreferrer"
+                   class="blog-settings-url">{{.Blog.FeedURL}}</a>
+                {{else}}
+                <span class="blog-settings-url blog-settings-url-empty">—</span>
+                {{end}}
+            </div>
+        </div>
         <div class="blog-settings-meta">
             <span class="article-count">{{.ArticleCount}} article{{if ne .ArticleCount 1}}s{{end}}</span>
         </div>

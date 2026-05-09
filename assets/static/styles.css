@@ -1151,6 +1151,29 @@ html:has(#theme-dark:checked) .action-btn-summarize {
   text-decoration: underline;
 }
 
+/* Blog Settings URL Row - Two-column display (Phase 19) */
+.blog-settings-url-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 8px;
+}
+
+.blog-url-column {
+  flex: 1;
+  min-width: 0; /* Allow text truncation */
+}
+
+.url-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.blog-settings-url-empty {
+  color: var(--text-muted);
+}
+
 .blog-settings-meta {
   display: flex;
   gap: 1rem;
