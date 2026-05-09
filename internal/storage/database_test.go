@@ -293,3 +293,292 @@ func openTestDB(t *testing.T) *Database {
 	}
 	return db
 }
+
+func TestCreateCategory(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	category, err := db.CreateCategory("Tech")
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	if category.ID == 0 {
+		t.Fatal("expected category ID")
+	}
+
+	if category.Name != "Tech" {
+		t.Errorf("Name = %q, want %q", category.Name, "Tech")
+	}
+
+	// Verify CreatedAt is recent (within 1 minute)
+	if time.Since(category.CreatedAt) > time.Minute {
+		t.Errorf("CreatedAt = %v, want recent time", category.CreatedAt)
+	}
+}
+
+func TestCreateCategoryEmptyName(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	_, err := db.CreateCategory("")
+	if err == nil {
+		t.Fatal("expected error for empty name")
+	}
+}
+
+func TestListCategoriesWithBlogCount(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	// Create categories
+	_, err := db.CreateCategory("News")
+	if err != nil {
+		t.Fatalf("create category News: %v", err)
+	}
+
+	techCat, err := db.CreateCategory("Tech")
+	if err != nil {
+		t.Fatalf("create category Tech: %v", err)
+	}
+
+	// Create blogs and assign to Tech category
+	blog1, err := db.AddBlog(model.Blog{Name: "Blog 1", URL: "https://1.example.com"})
+	if err != nil {
+		t.Fatalf("create blog 1: %v", err)
+	}
+	blog2, err := db.AddBlog(model.Blog{Name: "Blog 2", URL: "https://2.example.com"})
+	if err != nil {
+		t.Fatalf("create blog 2: %v", err)
+	}
+
+	// Assign blogs to Tech category
+	if err := db.UpdateBlogCategory(blog1.ID, &techCat.ID); err != nil {
+		t.Fatalf("assign blog 1 to Tech: %v", err)
+	}
+	if err := db.UpdateBlogCategory(blog2.ID, &techCat.ID); err != nil {
+		t.Fatalf("assign blog 2 to Tech: %v", err)
+	}
+
+	// List categories with blog count
+	categories, err := db.ListCategoriesWithBlogCount()
+	if err != nil {
+		t.Fatalf("list categories: %v", err)
+	}
+
+	if len(categories) != 2 {
+		t.Fatalf("expected 2 categories, got %d", len(categories))
+	}
+
+	// Should be ordered by name (News, Tech)
+	if categories[0].Name != "News" {
+		t.Errorf("first category = %q, want %q", categories[0].Name, "News")
+	}
+	if categories[1].Name != "Tech" {
+		t.Errorf("second category = %q, want %q", categories[1].Name, "Tech")
+	}
+
+	// Verify blog counts
+	if categories[0].BlogCount != 0 {
+		t.Errorf("News BlogCount = %d, want 0", categories[0].BlogCount)
+	}
+	if categories[1].BlogCount != 2 {
+		t.Errorf("Tech BlogCount = %d, want 2", categories[1].BlogCount)
+	}
+}
+
+func TestUpdateCategoryName(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	category, err := db.CreateCategory("Tech")
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	// Update name
+	err = db.UpdateCategoryName(category.ID, "Technology")
+	if err != nil {
+		t.Fatalf("update category name: %v", err)
+	}
+
+	// Verify update
+	categories, err := db.ListCategoriesWithBlogCount()
+	if err != nil {
+		t.Fatalf("list categories: %v", err)
+	}
+
+	if len(categories) != 1 {
+		t.Fatalf("expected 1 category, got %d", len(categories))
+	}
+
+	if categories[0].Name != "Technology" {
+		t.Errorf("Name = %q, want %q", categories[0].Name, "Technology")
+	}
+}
+
+func TestUpdateCategoryNameEmpty(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	category, err := db.CreateCategory("Tech")
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	err = db.UpdateCategoryName(category.ID, "")
+	if err == nil {
+		t.Fatal("expected error for empty name")
+	}
+}
+
+func TestUpdateCategoryNameNotFound(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	err := db.UpdateCategoryName(999, "NewName")
+	if err == nil {
+		t.Fatal("expected error for non-existent category")
+	}
+}
+
+func TestDeleteCategory(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	// Create category
+	category, err := db.CreateCategory("Tech")
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	// Create blogs and assign to category
+	blog1, err := db.AddBlog(model.Blog{Name: "Blog 1", URL: "https://1.example.com"})
+	if err != nil {
+		t.Fatalf("create blog 1: %v", err)
+	}
+	blog2, err := db.AddBlog(model.Blog{Name: "Blog 2", URL: "https://2.example.com"})
+	if err != nil {
+		t.Fatalf("create blog 2: %v", err)
+	}
+
+	if err := db.UpdateBlogCategory(blog1.ID, &category.ID); err != nil {
+		t.Fatalf("assign blog 1: %v", err)
+	}
+	if err := db.UpdateBlogCategory(blog2.ID, &category.ID); err != nil {
+		t.Fatalf("assign blog 2: %v", err)
+	}
+
+	// Delete category
+	err = db.DeleteCategory(category.ID)
+	if err != nil {
+		t.Fatalf("delete category: %v", err)
+	}
+
+	// Verify category deleted
+	categories, err := db.ListCategoriesWithBlogCount()
+	if err != nil {
+		t.Fatalf("list categories: %v", err)
+	}
+	if len(categories) != 0 {
+		t.Fatalf("expected 0 categories after delete, got %d", len(categories))
+	}
+
+	// Verify blog.category_id set to NULL
+	fetchedBlog1, err := db.GetBlogByID(blog1.ID)
+	if err != nil {
+		t.Fatalf("get blog 1: %v", err)
+	}
+	if fetchedBlog1.CategoryID != nil {
+		t.Errorf("blog 1 CategoryID = %d, want nil", *fetchedBlog1.CategoryID)
+	}
+
+	fetchedBlog2, err := db.GetBlogByID(blog2.ID)
+	if err != nil {
+		t.Fatalf("get blog 2: %v", err)
+	}
+	if fetchedBlog2.CategoryID != nil {
+		t.Errorf("blog 2 CategoryID = %d, want nil", *fetchedBlog2.CategoryID)
+	}
+}
+
+func TestDeleteCategoryNotFound(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	err := db.DeleteCategory(999)
+	if err == nil {
+		t.Fatal("expected error for non-existent category")
+	}
+}
+
+func TestUpdateBlogCategory(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	// Create category
+	category, err := db.CreateCategory("Tech")
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	// Create blog (uncategorized)
+	blog, err := db.AddBlog(model.Blog{Name: "Blog", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("create blog: %v", err)
+	}
+
+	// Verify initially uncategorized
+	fetched, err := db.GetBlogByID(blog.ID)
+	if err != nil {
+		t.Fatalf("get blog: %v", err)
+	}
+	if fetched.CategoryID != nil {
+		t.Fatalf("initial CategoryID = %d, want nil", *fetched.CategoryID)
+	}
+
+	// Assign to category
+	err = db.UpdateBlogCategory(blog.ID, &category.ID)
+	if err != nil {
+		t.Fatalf("assign to category: %v", err)
+	}
+
+	// Verify category assigned
+	fetched, err = db.GetBlogByID(blog.ID)
+	if err != nil {
+		t.Fatalf("get blog: %v", err)
+	}
+	if fetched.CategoryID == nil || *fetched.CategoryID != category.ID {
+		t.Errorf("CategoryID = %v, want %d", fetched.CategoryID, category.ID)
+	}
+
+	// Set back to uncategorized (nil)
+	err = db.UpdateBlogCategory(blog.ID, nil)
+	if err != nil {
+		t.Fatalf("set uncategorized: %v", err)
+	}
+
+	// Verify uncategorized again
+	fetched, err = db.GetBlogByID(blog.ID)
+	if err != nil {
+		t.Fatalf("get blog: %v", err)
+	}
+	if fetched.CategoryID != nil {
+		t.Errorf("CategoryID = %d, want nil", *fetched.CategoryID)
+	}
+}
+
+func TestUpdateBlogCategoryNotFound(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	category, err := db.CreateCategory("Tech")
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	err = db.UpdateBlogCategory(999, &category.ID)
+	if err == nil {
+		t.Fatal("expected error for non-existent blog")
+	}
+}

@@ -320,7 +320,7 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) ListBlogs() ([]model.Blog, error) {
-	rows, err := db.conn.Query(`SELECT id, name, url, feed_url, scrape_selector, last_scanned FROM blogs ORDER BY name`)
+	rows, err := db.conn.Query(`SELECT id, name, url, feed_url, scrape_selector, last_scanned, category_id FROM blogs ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -345,6 +345,12 @@ type BlogWithCount struct {
 	ArticleCount int
 }
 
+// CategoryWithBlogCount extends Category with blog count for display.
+type CategoryWithBlogCount struct {
+	model.Category
+	BlogCount int
+}
+
 // ListBlogsWithCounts returns all blogs with their article counts.
 // Uses LEFT JOIN to include blogs with zero articles.
 func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
@@ -355,10 +361,11 @@ func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
 		b.feed_url,
 		b.scrape_selector,
 		b.last_scanned,
+		b.category_id,
 		COUNT(a.id) as article_count
 	FROM blogs b
 	LEFT JOIN articles a ON b.id = a.blog_id
-	GROUP BY b.id, b.name, b.url, b.feed_url, b.scrape_selector, b.last_scanned
+	GROUP BY b.id, b.name, b.url, b.feed_url, b.scrape_selector, b.last_scanned, b.category_id
 	ORDER BY b.name`
 
 	rows, err := db.conn.Query(query)
@@ -376,9 +383,10 @@ func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
 			feedURL        sql.NullString
 			scrapeSelector sql.NullString
 			lastScanned    sql.NullString
+			categoryID     sql.NullInt64
 			articleCount   int
 		)
-		if err := rows.Scan(&id, &name, &url, &feedURL, &scrapeSelector, &lastScanned, &articleCount); err != nil {
+		if err := rows.Scan(&id, &name, &url, &feedURL, &scrapeSelector, &lastScanned, &categoryID, &articleCount); err != nil {
 			return nil, err
 		}
 
@@ -396,6 +404,9 @@ func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
 			if parsed, err := parseTime(lastScanned.String); err == nil {
 				blog.LastScanned = &parsed
 			}
+		}
+		if categoryID.Valid {
+			blog.CategoryID = &categoryID.Int64
 		}
 		blogs = append(blogs, blog)
 	}
@@ -647,13 +658,13 @@ func (db *Database) MarkAllUnreadArticlesRead(blogID *int64) error {
 
 // GetBlogByName returns a blog by its name, or nil if not found.
 func (db *Database) GetBlogByName(name string) (*model.Blog, error) {
-	row := db.conn.QueryRow(`SELECT id, name, url, feed_url, scrape_selector, last_scanned FROM blogs WHERE name = ?`, name)
+	row := db.conn.QueryRow(`SELECT id, name, url, feed_url, scrape_selector, last_scanned, category_id FROM blogs WHERE name = ?`, name)
 	return scanBlog(row)
 }
 
 // GetBlogByID returns a blog by its ID, or nil if not found.
 func (db *Database) GetBlogByID(id int64) (*model.Blog, error) {
-	row := db.conn.QueryRow(`SELECT id, name, url, feed_url, scrape_selector, last_scanned FROM blogs WHERE id = ?`, id)
+	row := db.conn.QueryRow(`SELECT id, name, url, feed_url, scrape_selector, last_scanned, category_id FROM blogs WHERE id = ?`, id)
 	return scanBlog(row)
 }
 
@@ -665,7 +676,7 @@ func (db *Database) GetArticleByID(id int64) (*model.Article, error) {
 
 // GetBlogByURL returns a blog by its URL, or nil if not found.
 func (db *Database) GetBlogByURL(url string) (*model.Blog, error) {
-	row := db.conn.QueryRow(`SELECT id, name, url, feed_url, scrape_selector, last_scanned FROM blogs WHERE url = ?`, url)
+	row := db.conn.QueryRow(`SELECT id, name, url, feed_url, scrape_selector, last_scanned, category_id FROM blogs WHERE url = ?`, url)
 	return scanBlog(row)
 }
 
@@ -883,8 +894,9 @@ func scanBlog(scanner interface{ Scan(dest ...any) error }) (*model.Blog, error)
 		feedURL        sql.NullString
 		scrapeSelector sql.NullString
 		lastScanned    sql.NullString
+		categoryID     sql.NullInt64
 	)
-	if err := scanner.Scan(&id, &name, &url, &feedURL, &scrapeSelector, &lastScanned); err != nil {
+	if err := scanner.Scan(&id, &name, &url, &feedURL, &scrapeSelector, &lastScanned, &categoryID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -902,6 +914,9 @@ func scanBlog(scanner interface{ Scan(dest ...any) error }) (*model.Blog, error)
 		if parsed, err := parseTime(lastScanned.String); err == nil {
 			blog.LastScanned = &parsed
 		}
+	}
+	if categoryID.Valid {
+		blog.CategoryID = &categoryID.Int64
 	}
 	return blog, nil
 }
@@ -1193,4 +1208,163 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 	}
 
 	return articles, rows.Err()
+}
+
+// CreateCategory creates a new category and returns it with the assigned ID.
+// Returns error if name is empty.
+func (db *Database) CreateCategory(name string) (model.Category, error) {
+	if name == "" {
+		return model.Category{}, errors.New("category name cannot be empty")
+	}
+
+	now := time.Now()
+	result, err := db.conn.Exec(
+		`INSERT INTO categories (name, created_at) VALUES (?, ?)`,
+		name,
+		now.Format(sqliteTimeLayout),
+	)
+	if err != nil {
+		return model.Category{}, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return model.Category{}, err
+	}
+
+	return model.Category{
+		ID:        id,
+		Name:      name,
+		CreatedAt: now,
+	}, nil
+}
+
+// ListCategoriesWithBlogCount returns all categories with their blog counts.
+// Uses LEFT JOIN to include categories with zero blogs.
+// Categories are ordered by name alphabetically.
+func (db *Database) ListCategoriesWithBlogCount() ([]CategoryWithBlogCount, error) {
+	query := `SELECT
+		c.id,
+		c.name,
+		c.created_at,
+		COUNT(b.id) as blog_count
+	FROM categories c
+	LEFT JOIN blogs b ON b.category_id = c.id
+	GROUP BY c.id
+	ORDER BY c.name`
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []CategoryWithBlogCount
+	for rows.Next() {
+		var (
+			id        int64
+			name      string
+			createdAt sql.NullString
+			blogCount int
+		)
+		if err := rows.Scan(&id, &name, &createdAt, &blogCount); err != nil {
+			return nil, err
+		}
+
+		category := CategoryWithBlogCount{
+			Category: model.Category{
+				ID:   id,
+				Name: name,
+			},
+			BlogCount: blogCount,
+		}
+		if createdAt.Valid {
+			if parsed, err := parseTime(createdAt.String); err == nil {
+				category.Category.CreatedAt = parsed
+			}
+		}
+		categories = append(categories, category)
+	}
+	return categories, rows.Err()
+}
+
+// UpdateCategoryName updates the name of a category by ID.
+// Returns error if name is empty or category does not exist.
+func (db *Database) UpdateCategoryName(id int64, name string) error {
+	if name == "" {
+		return errors.New("category name cannot be empty")
+	}
+
+	result, err := db.conn.Exec(`UPDATE categories SET name = ? WHERE id = ?`, name, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("category not found: %d", id)
+	}
+
+	return nil
+}
+
+// DeleteCategory deletes a category and sets all associated blogs' category_id to NULL.
+// Uses a transaction to ensure atomicity.
+func (db *Database) DeleteCategory(id int64) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	// Set associated blogs' category_id to NULL
+	if _, err := tx.Exec(`UPDATE blogs SET category_id = NULL WHERE category_id = ?`, id); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("nullify blog category_id: %w", err)
+	}
+
+	// Delete the category
+	result, err := tx.Exec(`DELETE FROM categories WHERE id = ?`, id)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("delete category: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("check rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		_ = tx.Rollback()
+		return fmt.Errorf("category not found: %d", id)
+	}
+
+	return tx.Commit()
+}
+
+// UpdateBlogCategory updates the category_id for a blog.
+// categoryID can be nil to set the blog as uncategorized.
+func (db *Database) UpdateBlogCategory(blogID int64, categoryID *int64) error {
+	var catID sql.NullInt64
+	if categoryID != nil {
+		catID = sql.NullInt64{Int64: *categoryID, Valid: true}
+	}
+
+	result, err := db.conn.Exec(`UPDATE blogs SET category_id = ? WHERE id = ?`, catID, blogID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("blog not found: %d", blogID)
+	}
+
+	return nil
 }
