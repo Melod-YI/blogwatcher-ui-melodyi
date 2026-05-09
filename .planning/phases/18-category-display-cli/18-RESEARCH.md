@@ -459,14 +459,14 @@ func (db *Database) ListCategoriesWithBlogCount() ([]CategoryWithBlogCount, erro
 
 **Verification needed:** 检查 GetCategoryByName 是否已实现（Phase 17 可能已添加）。
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **GetCategoryByName 方法是否存在？**
+1. **GetCategoryByName 方法是否存在？** — RESOLVED: 新增 GetCategoryByName 方法，复用 scanCategory 模式（Plan 18-01 Task 2 实现）
    - What we know: Phase 17 实现了分类 CRUD，但 grep 未找到 GetCategoryByName
    - What's unclear: 是否在其他文件中实现
    - Recommendation: 新增 GetCategoryByName 方法，复用 scanCategory 模式
 
-2. **分类分组数据结构如何定义？**
+2. **分类分组数据结构如何定义？** — RESOLVED: 定义 GroupedSidebar struct（Plan 18-02 Task 1 实现）
    - What we know: ListCategoriesWithBlogCount() 返回 CategoryWithBlogCount，ListBlogsWithCounts() 返回 BlogWithCount
    - What's unclear: handler 如何组装分组数据传递给模板
    - Recommendation: 定义 GroupedSidebar struct:
@@ -481,7 +481,7 @@ func (db *Database) ListCategoriesWithBlogCount() ([]CategoryWithBlogCount, erro
      }
      ```
 
-3. **是否需要新增 category-group.gohtml 模板？**
+3. **是否需要新增 category-group.gohtml 模板？** — RESOLVED: 创建 category-group.gohtml partial（Plan 18-02 Task 3 实现）
    - What we know: blog-list.gohtml 是现有渲染片段
    - What's unclear: 是否直接修改 sidebar.gohtml 或创建新 partial
    - Recommendation: 创建 category-group.gohtml partial，保持模块化
