@@ -103,6 +103,14 @@ Shipped in v1.4:
 - ✓ **NOTE-11**: Markdown 渲染支持 GFM 格式 — v1.4
 - ✓ **NOTE-12**: 备注页面显示文章标题和原文链接 — v1.4
 
+Shipped in v1.5 (Phase 17):
+
+- ✓ **CATG-03**: 设置页面添加分类管理区 — v1.5
+- ✓ **CATG-04**: 用户可创建新分类（输入名称）— v1.5
+- ✓ **CATG-05**: 用户可编辑分类名称（inline 编辑）— v1.5
+- ✓ **CATG-06**: 用户可删除分类（删除时 blog.category_id 置空）— v1.5
+- ✓ **CATG-07**: Blog 编辑时可选择分类（下拉选择）— v1.5
+
 ### Active
 
 (None — will be defined during requirements phase)
@@ -120,12 +128,14 @@ Shipped in v1.4:
 
 ## Context
 
-**Current state (v1.4 shipped 2026-05-08):**
-- Full CRUD for blog articles via UI and CLI
-- Note-taking system: CLI write/delete, UI Markdown display
-- Tech stack: Go server + HTMX + SQLite + Cobra CLI + Goldmark
-- Database: ~/.blogwatcher/blogwatcher.db + notes/{id}.md files
-- Total milestones: 4 (v1.0-v1.4), 62 requirements validated
+**Current state (v1.5 phase 17 complete 2026-05-09):**
+- Phase 17 complete: Category Management UI with full CRUD (database methods, HTTP handlers, Go templates)
+- Category section integrated into Settings page
+- Category dropdown added to Blog edit form
+- Database: CreateCategory, ListCategoriesWithBlogCount, UpdateCategoryName, DeleteCategory, UpdateBlogCategory
+- 7 REST handlers for category CRUD with HTMX inline editing
+- 6 Go templates for category UI components
+- Total milestones: 4 (v1.0-v1.4), 62 requirements validated + 5 category requirements in v1.5
 
 **Reference codebase:** `.reference/blogwatcher/` contains the Go CLI tool that:
 - Tracks blogs via RSS/Atom feeds or HTML scraping
