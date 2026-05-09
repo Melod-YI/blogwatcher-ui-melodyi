@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlogWatcher - Subscriptions Category Grouping Prototype</title>
+    <style>
+        /* ============================================
+           CSS Custom Properties - Theme System
+           ============================================ */
+        :root {
+            /* Light theme (default) */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --bg-hover: #f3f4f6;
+            --bg-active: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --category-bg: transparent;
+            --category-border: #d1d5db;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --radius-sm: 4px;
+            --radius-md: 6px;
+
+            /* Typography */
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            --font-mono: "SF Mono", Monaco, "Cascadia Code", monospace;
+
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 12px;
+            --space-lg: 16px;
+            --space-xl: 24px;
+
+            /* Transitions */
+            --transition-fast: 150ms ease;
+            --transition-normal: 250ms ease;
+        }
+
+        /* Dark theme */
+        [data-theme="dark"] {
+            --bg-primary: #1f2937;
+            --bg-secondary: #111827;
+            --bg-hover: #374151;
+            --bg-active: #4b5563;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --text-muted: #9ca3af;
+            --border-color: #374151;
+            --accent-color: #60a5fa;
+            --accent-hover: #3b82f6;
+            --category-bg: transparent;
+            --category-border: #4b5563;
+        }
+
+        /* ============================================
+           Base Layout
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .prototype-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: var(--space-xl);
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--space-xl);
+        }
+
+        .sidebar-variants {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xl);
+        }
+
+        .variant-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+
+        .variant-header {
+            padding: var(--space-md) var(--space-lg);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .variant-header::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            background: var(--accent-color);
+            border-radius: 50%;
+        }
+
+        .sidebar-component {
+            width: 280px;
+            background: var(--bg-primary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: var(--space-lg);
+        }
+
+        /* ============================================
+           Sidebar Structure
+           ============================================ */
+        .sidebar-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: var(--space-md);
+            text-transform: uppercase;
+        }
+
+        /* ============================================
+           Variant A: Minimalist (No category labels)
+           ============================================ */
+        .variant-a .category-group {
+            margin-bottom: var(--space-md);
+        }
+
+        .variant-a .category-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm) 0;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: color var(--transition-fast);
+            border-radius: var(--radius-sm);
+            padding: var(--space-sm);
+        }
+
+        .variant-a .category-header:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .variant-a .category-header .expand-icon {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform var(--transition-normal);
+        }
+
+        .variant-a .category-header.collapsed .expand-icon {
+            transform: rotate(-90deg);
+        }
+
+        .variant-a .category-blogs {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding-left: var(--space-lg);
+            margin-top: var(--space-sm);
+            overflow: hidden;
+            max-height: 500px;
+            transition: max-height var(--transition-normal), opacity var(--transition-fast);
+        }
+
+        .variant-a .category-group.collapsed .category-blogs {
+            max-height: 0;
+            opacity: 0;
+        }
+
+        .variant-a .blog-item {
+            display: block;
+            padding: var(--space-sm) var(--space-md);
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-fast);
+            cursor: pointer;
+        }
+
+        .variant-a .blog-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .variant-a .blog-item.active {
+            background: var(--bg-active);
+            color: var(--accent-color);
+            font-weight: 500;
+        }
+
+        /* Uncategorized blogs - no grouping */
+        .variant-a .uncategorized-section {
+            margin-bottom: var(--space-md);
+        }
+
+        .variant-a .uncategorized-section .blog-item {
+            padding-left: var(--space-sm);
+        }
+
+        /* Empty category - hidden */
+        .variant-a .category-group.empty {
+            display: none;
+        }
+
+        /* ============================================
+           Variant B: Grouped with Count Badge
+           ============================================ */
+        .variant-b .category-group {
+            margin-bottom: var(--space-lg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+
+        .variant-b .category-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--space-md);
+            background: var(--bg-secondary);
+            cursor: pointer;
+            transition: background var(--transition-fast);
+            border-bottom: 1px solid transparent;
+        }
+
+        .variant-b .category-header:hover {
+            background: var(--bg-hover);
+        }
+
+        .variant-b .category-header.collapsed {
+            border-bottom-color: transparent;
+        }
+
+        .variant-b .category-header:not(.collapsed) {
+            border-bottom-color: var(--border-color);
+        }
+
+        .variant-b .category-name {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .variant-b .category-name .expand-icon {
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform var(--transition-normal);
+            color: var(--text-muted);
+        }
+
+        .variant-b .category-header.collapsed .expand-icon {
+            transform: rotate(-90deg);
+        }
+
+        .variant-b .category-count {
+            font-size: 11px;
+            padding: 2px 8px;
+            background: var(--accent-color);
+            color: white;
+            border-radius: 10px;
+            font-weight: 600;
+            opacity: 0.8;
+        }
+
+        .variant-b .category-blogs {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            max-height: 500px;
+            transition: max-height var(--transition-normal);
+        }
+
+        .variant-b .category-group.collapsed .category-blogs {
+            max-height: 0;
+        }
+
+        .variant-b .blog-item {
+            display: block;
+            padding: var(--space-sm) var(--space-lg);
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all var(--transition-fast);
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        .variant-b .blog-item:last-child {
+            border-bottom: none;
+        }
+
+        .variant-b .blog-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .variant-b .blog-item.active {
+            background: var(--bg-active);
+            color: var(--accent-color);
+            font-weight: 500;
+        }
+
+        /* Uncategorized - special styling */
+        .variant-b .uncategorized-group {
+            border: none;
+            margin-bottom: var(--space-lg);
+        }
+
+        .variant-b .uncategorized-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm) 0;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .variant-b .uncategorized-blogs {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        /* Empty category - visible but styled differently */
+        .variant-b .category-group.empty {
+            opacity: 0.5;
+        }
+
+        .variant-b .category-group.empty .category-header:hover {
+            background: transparent;
+            cursor: not-allowed;
+        }
+
+        /* ============================================
+           Variant C: Hybrid (Categories first, uncategorized at end)
+           ============================================ */
+        .variant-c .category-group {
+            margin-bottom: var(--space-md);
+        }
+
+        .variant-c .category-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-fast);
+            margin-bottom: var(--space-sm);
+        }
+
+        .variant-c .category-header:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .variant-c .category-header .expand-icon {
+            width: 12px;
+            height: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform var(--transition-normal);
+            color: var(--text-muted);
+        }
+
+        .variant-c .category-header.collapsed .expand-icon {
+            transform: rotate(-90deg);
+        }
+
+        .variant-c .category-count {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .variant-c .category-blogs {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding-left: var(--space-md);
+            overflow: hidden;
+            max-height: 500px;
+            transition: max-height var(--transition-normal), opacity var(--transition-fast);
+        }
+
+        .variant-c .category-group.collapsed .category-blogs {
+            max-height: 0;
+            opacity: 0;
+        }
+
+        .variant-c .blog-item {
+            display: block;
+            padding: var(--space-sm) var(--space-md);
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-fast);
+            cursor: pointer;
+        }
+
+        .variant-c .blog-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .variant-c .blog-item.active {
+            background: var(--bg-active);
+            color: var(--accent-color);
+            font-weight: 500;
+        }
+
+        /* Uncategorized - at the END with separator */
+        .variant-c .uncategorized-section {
+            margin-top: var(--space-lg);
+            padding-top: var(--space-lg);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .variant-c .uncategorized-header {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: var(--space-sm);
+        }
+
+        /* ============================================
+           Interaction Panel (Right Side)
+           ============================================ */
+        .interaction-panel {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--space-xl);
+            height: fit-content;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: var(--space-lg);
+            color: var(--text-primary);
+        }
+
+        .discussion-point {
+            margin-bottom: var(--space-lg);
+            padding: var(--space-md);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .discussion-point h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: var(--space-sm);
+            color: var(--text-primary);
+        }
+
+        .discussion-point ul {
+            list-style: none;
+            padding-left: var(--space-md);
+        }
+
+        .discussion-point li {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-xs);
+            position: relative;
+        }
+
+        .discussion-point li::before {
+            content: "•";
+            color: var(--text-muted);
+            position: absolute;
+            left: -12px;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: var(--space-lg);
+            right: var(--space-lg);
+            padding: var(--space-sm) var(--space-md);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: all var(--transition-fast);
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* ============================================
+           Icons (SVG)
+           ============================================ */
+        .icon-chevron {
+            width: 12px;
+            height: 12px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* ============================================
+           Collapsed state persistence indicator
+           ============================================ */
+        .persistence-note {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: var(--space-lg);
+            padding: var(--space-sm);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            text-align: center;
+        }
+
+        /* ============================================
+           Animation for page load
+           ============================================ */
+        .category-group, .uncategorized-section {
+            animation: fadeSlideIn 300ms ease forwards;
+        }
+
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .category-group:nth-child(1) { animation-delay: 0ms; }
+        .category-group:nth-child(2) { animation-delay: 50ms; }
+        .category-group:nth-child(3) { animation-delay: 100ms; }
+        .uncategorized-section { animation-delay: 150ms; }
+    </style>
+</head>
+<body data-theme="light">
+    <button class="theme-toggle" onclick="toggleTheme()">
+        🌓 切换主题
+    </button>
+
+    <div class="prototype-container">
+        <!-- Left: Sidebar Variants -->
+        <div class="sidebar-variants">
+            <!-- Variant A: Minimalist -->
+            <div class="variant-card">
+                <div class="variant-header">方案 A: 极简主义（无分类标签）</div>
+                <div class="sidebar-component variant-a">
+                    <div class="sidebar-section-title">Subscriptions</div>
+
+                    <!-- Uncategorized first -->
+                    <div class="uncategorized-section">
+                        <a href="#" class="blog-item active">个人博客</a>
+                        <a href="#" class="blog-item">随机收藏</a>
+                    </div>
+
+                    <!-- Categories with minimal headers -->
+                    <div class="category-group" data-category="tech">
+                        <div class="category-header" onclick="toggleCategory(this)">
+                            <span class="expand-icon">
+                                <svg class="icon-chevron" viewBox="0 0 24 24">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                            Tech
+                        </div>
+                        <div class="category-blogs">
+                            <a href="#" class="blog-item">Hacker News</a>
+                            <a href="#" class="blog-item">Go Blog</a>
+                            <a href="#" class="blog-item">React Blog</a>
+                        </div>
+                    </div>
+
+                    <div class="category-group collapsed" data-category="news">
+                        <div class="category-header" onclick="toggleCategory(this)">
+                            <span class="expand-icon">
+                                <svg class="icon-chevron" viewBox="0 0 24 24">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                            News
+                        </div>
+                        <div class="category-blogs">
+                            <a href="#" class="blog-item">BBC Tech</a>
+                            <a href="#" class="blog-item">TechCrunch</a>
+                        </div>
+                    </div>
+
+                    <!-- Empty category - hidden -->
+                    <div class="category-group empty" data-category="empty" style="display: none;">
+                        <div class="category-header">
+                            <span class="expand-icon">
+                                <svg class="icon-chevron" viewBox="0 0 24 24">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                            Empty Category
+                        </div>
+                        <div class="category-blogs"></div>
+                    </div>
+
+                    <div class="persistence-note">
+                        ✓ 折叠状态保存到 localStorage
+                    </div>
+                </div>
+            </div>
+
+            <!-- Variant B: Grouped with Badges -->
+            <div class="variant-card">
+                <div class="variant-header">方案 B: 分组 + 计数徽章</div>
+                <div class="sidebar-component variant-b">
+                    <div class="sidebar-section-title">Subscriptions</div>
+
+                    <!-- Uncategorized with label -->
+                    <div class="uncategorized-group">
+                        <div class="uncategorized-header">未分类</div>
+                        <div class="uncategorized-blogs">
+                            <a href="#" class="blog-item">个人博客</a>
+                            <a href="#" class="blog-item">随机收藏</a>
+                        </div>
+                    </div>
+
+                    <!-- Categories with badges -->
+                    <div class="category-group" data-category="tech">
+                        <div class="category-header" onclick="toggleCategory(this)">
+                            <div class="category-name">
+                                <span class="expand-icon">
+                                    <svg class="icon-chevron" viewBox="0 0 24 24">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </span>
+                                Tech
+                            </div>
+                            <span class="category-count">3</span>
+                        </div>
+                        <div class="category-blogs">
+                            <a href="#" class="blog-item">Hacker News</a>
+                            <a href="#" class="blog-item">Go Blog</a>
+                            <a href="#" class="blog-item">React Blog</a>
+                        </div>
+                    </div>
+
+                    <div class="category-group collapsed" data-category="news">
+                        <div class="category-header" onclick="toggleCategory(this)">
+                            <div class="category-name">
+                                <span class="expand-icon">
+                                    <svg class="icon-chevron" viewBox="0 0 24 24">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </span>
+                                News
+                            </div>
+                            <span class="category-count">2</span>
+                        </div>
+                        <div class="category-blogs">
+                            <a href="#" class="blog-item">BBC Tech</a>
+                            <a href="#" class="blog-item">TechCrunch</a>
+                        </div>
+                    </div>
+
+                    <!-- Empty category - visible but faded -->
+                    <div class="category-group empty collapsed" data-category="empty">
+                        <div class="category-header">
+                            <div class="category-name">
+                                <span class="expand-icon">
+                                    <svg class="icon-chevron" viewBox="0 0 24 24">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </span>
+                                Empty Category
+                            </div>
+                            <span class="category-count">0</span>
+                        </div>
+                        <div class="category-blogs"></div>
+                    </div>
+
+                    <div class="persistence-note">
+                        ✓ 折叠状态保存到 localStorage
+                    </div>
+                </div>
+            </div>
+
+            <!-- Variant C: Hybrid -->
+            <div class="variant-card">
+                <div class="variant-header">方案 C: 混合（分类在前，未分类在后）</div>
+                <div class="sidebar-component variant-c">
+                    <div class="sidebar-section-title">Subscriptions</div>
+
+                    <!-- Categories first -->
+                    <div class="category-group" data-category="tech">
+                        <div class="category-header" onclick="toggleCategory(this)">
+                            <span class="expand-icon">
+                                <svg class="icon-chevron" viewBox="0 0 24 24">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                            Tech
+                            <span class="category-count">3</span>
+                        </div>
+                        <div class="category-blogs">
+                            <a href="#" class="blog-item">Hacker News</a>
+                            <a href="#" class="blog-item">Go Blog</a>
+                            <a href="#" class="blog-item">React Blog</a>
+                        </div>
+                    </div>
+
+                    <div class="category-group collapsed" data-category="news">
+                        <div class="category-header" onclick="toggleCategory(this)">
+                            <span class="expand-icon">
+                                <svg class="icon-chevron" viewBox="0 0 24 24">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                            News
+                            <span class="category-count">2</span>
+                        </div>
+                        <div class="category-blogs">
+                            <a href="#" class="blog-item">BBC Tech</a>
+                            <a href="#" class="blog-item">TechCrunch</a>
+                        </div>
+                    </div>
+
+                    <!-- Uncategorized at the END with separator -->
+                    <div class="uncategorized-section">
+                        <div class="uncategorized-header">未分类</div>
+                        <a href="#" class="blog-item">个人博客</a>
+                        <a href="#" class="blog-item">随机收藏</a>
+                    </div>
+
+                    <div class="persistence-note">
+                        ✓ 折叠状态保存到 localStorage
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Discussion Panel -->
+        <div class="interaction-panel">
+            <h2 class="panel-title">🎯 Phase 18 UI 设计讨论点</h2>
+
+            <div class="discussion-point">
+                <h3>1. 未分类 Blog 位置</h3>
+                <ul>
+                    <li><strong>方案 A:</strong> 顶层，无标签（极简）</li>
+                    <li><strong>方案 B:</strong> 顶层，有"未分类"标签</li>
+                    <li><strong>方案 C:</strong> 分类之后，分隔线区分</li>
+                    <li>考虑: 用户习惯（先看分类还是先看未分类）</li>
+                </ul>
+            </div>
+
+            <div class="discussion-point">
+                <h3>2. 分类标题样式</h3>
+                <ul>
+                    <li><strong>方案 A:</strong> 小字体 + chevron，hover 高亮</li>
+                    <li><strong>方案 B:</strong> 背景块 + 计数徽章（蓝色 badge）</li>
+                    <li><strong>方案 C:</strong> 背景色 + 右侧计数（灰色）</li>
+                    <li>点击整个标题区域展开/折叠</li>
+                </ul>
+            </div>
+
+            <div class="discussion-point">
+                <h3>3. 展开/折叠交互</h3>
+                <ul>
+                    <li><strong>统一:</strong> 所有方案使用 chevron 旋转动画</li>
+                    <li><strong>动画:</strong> 250ms ease，流畅自然</li>
+                    <li><strong>持久化:</strong> localStorage 记住展开状态</li>
+                    <li><strong>默认:</strong> 全部展开（用户可见所有 blog）</li>
+                </ul>
+            </div>
+
+            <div class="discussion-point">
+                <h3>4. 空分类显示</h3>
+                <ul>
+                    <li><strong>方案 A:</strong> 完全隐藏（不显示空分类）</li>
+                    <li><strong>方案 B:</strong> 显示但 faded + badge "0"</li>
+                    <li>考虑: 用户可能想知道分类存在但无 blog</li>
+                </ul>
+            </div>
+
+            <div class="discussion-point">
+                <h3>5. Blog 项样式</h3>
+                <ul>
+                    <li>继承现有 blog-item 类（hover 背景 + active 高亮）</li>
+                    <li><strong>方案 A/C:</strong> 简洁链接样式</li>
+                    <li><strong>方案 B:</strong> 有分隔线，更明显的分组边界</li>
+                </ul>
+            </div>
+
+            <div class="discussion-point">
+                <h3>6. 主题适配</h3>
+                <ul>
+                    <li>点击右上角 "切换主题" 测试 Light/Dark</li>
+                    <li>所有方案都使用 CSS custom properties</li>
+                    <li>与现有 sidebar.gohtml 风格一致</li>
+                </ul>
+            </div>
+
+            <div style="margin-top: 24px; padding: 16px; background: var(--bg-secondary); border-radius: 6px;">
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+                    <strong>💡 提示：</strong>点击分类标题测试展开/折叠交互
+                </p>
+                <p style="font-size: 12px; color: var(--text-muted);">
+                    选择你喜欢的方案编号，或提出调整建议
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle category expansion
+        function toggleCategory(header) {
+            const group = header.parentElement;
+            const isCollapsed = group.classList.contains('collapsed');
+
+            if (isCollapsed) {
+                group.classList.remove('collapsed');
+            } else {
+                group.classList.add('collapsed');
+            }
+
+            // Persist to localStorage
+            saveExpandState();
+        }
+
+        // Save expand state to localStorage
+        function saveExpandState() {
+            const state = {};
+            document.querySelectorAll('.category-group').forEach(group => {
+                const category = group.dataset.category;
+                state[category] = !group.classList.contains('collapsed');
+            });
+            localStorage.setItem('sidebar-expand-state', JSON.stringify(state));
+        }
+
+        // Load expand state from localStorage
+        function loadExpandState() {
+            const saved = localStorage.getItem('sidebar-expand-state');
+            if (saved) {
+                const state = JSON.parse(saved);
+                document.querySelectorAll('.category-group').forEach(group => {
+                    const category = group.dataset.category;
+                    if (state[category] === false) {
+                        group.classList.add('collapsed');
+                    }
+                });
+            }
+        }
+
+        // Toggle theme
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.dataset.theme;
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            body.dataset.theme = newTheme;
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // Load saved theme
+        function loadTheme() {
+            const saved = localStorage.getItem('theme');
+            if (saved) {
+                document.body.dataset.theme = saved;
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTheme();
+            loadExpandState();
+        });
+
+        // Blog item click handler (demo)
+        document.querySelectorAll('.blog-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Remove active from all
+                document.querySelectorAll('.blog-item').forEach(i => i.classList.remove('active'));
+                // Add active to clicked
+                item.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
