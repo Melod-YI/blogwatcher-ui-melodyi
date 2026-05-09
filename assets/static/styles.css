@@ -1235,6 +1235,55 @@ html:has(#theme-dark:checked) .action-btn-summarize {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+/* Blog Edit URL Input - URL 输入框样式 (Phase 19) */
+.blog-edit-url,
+.blog-edit-feed-url {
+  margin-bottom: 16px;
+}
+
+.edit-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.blog-edit-url input,
+.blog-edit-feed-url input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.blog-edit-url input:focus,
+.blog-edit-feed-url input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* URL Validation - 错误提示样式 */
+.blog-edit-url input:invalid,
+.blog-edit-feed-url input:invalid {
+  border-color: #dc2626;
+}
+
+.url-error-message {
+  display: none; /* 默认隐藏 */
+  color: #dc2626;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.blog-edit-url input:invalid + .url-error-message,
+.blog-edit-feed-url input:invalid + .url-error-message {
+  display: block; /* 验证失败时显示 */
+}
+
 .blog-edit-actions {
   display: flex;
   gap: 0.5rem;
