@@ -51,19 +51,23 @@ Exceptions:
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 16px | 400 (regular) | 1.5 |
-| Label | 12px (0.75rem) | 700 (bold) | 1.5 |
+| Label | 12px (0.75rem) | 600 (semibold) | 1.5 |
 | Category Header | 13px | 600 (semibold) | 1.2 |
-| Uncategorized Header | 11px (0.6875rem) | 700 (bold) | 1.5 |
+| Uncategorized Header | 12px (0.75rem) | 600 (semibold) | 1.5 |
 | Blog Item | 13px | 400 (regular) | 1.5 |
-| Category Count | 10px (0.625rem) | 400 (regular) | 1.5 |
+| Category Count | 12px (0.75rem) | 400 (regular) | 1.5 |
 
 **说明：**
 - Body: 匹配现有 html font-size: 16px, line-height: 1.5
-- Label: 匹配现有 .nav-section-title 样式
+- Label: 匹配现有 .nav-section-title 样式，12px weight 600
 - Category Header: 方案C设计，13px font-weight 600
-- Uncategorized Header: 方案C设计，11px uppercase letter-spacing 0.05em
+- Uncategorized Header: 方案C设计调整，12px weight 600，uppercase letter-spacing 0.05em
 - Blog Item: 保持现有 13px (继承自 body，无显式字号)
-- Category Count: 方案C设计，右侧灰色计数
+- Category Count: 方案C设计调整，12px 常规字重
+
+**Typography Scale Summary:**
+- Sizes: 16px, 13px, 12px (3 sizes, max 4 allowed)
+- Weights: 400, 600 (2 weights, max 2 allowed)
 
 ---
 
@@ -209,7 +213,7 @@ Subscriptions
 
 ```css
 .category-count {
-  font-size: 10px;
+  font-size: 12px;       /* 调整：从 10px 合并到 12px */
   color: var(--text-muted);  /* 需新增 CSS 变量 */
   margin-left: auto;
 }
@@ -225,8 +229,8 @@ Subscriptions
 }
 
 .uncategorized-header {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;       /* 调整：从 11px 合并到 12px */
+  font-weight: 600;      /* 调整：从 700 改为 600 */
   letter-spacing: 0.05em;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -420,7 +424,7 @@ html.dark {
 
 /* 分类计数 */
 .category-count {
-  font-size: 10px;
+  font-size: 12px;       /* 调整：从 10px 合并到 12px */
   color: var(--text-muted);
   margin-left: auto;
 }
@@ -449,8 +453,8 @@ html.dark {
 }
 
 .uncategorized-header {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;       /* 调整：从 11px 合并到 12px */
+  font-weight: 600;      /* 调整：从 700 改为 600 */
   letter-spacing: 0.05em;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -541,7 +545,7 @@ html.dark {
 - [ ] Dimension 1 Copywriting: PASS (文案与现有风格一致)
 - [ ] Dimension 2 Visuals: PASS (方案C原型已验证)
 - [ ] Dimension 3 Color: PASS (使用现有CSS变量)
-- [ ] Dimension 4 Typography: PASS (匹配现有样式系统)
+- [ ] Dimension 4 Typography: PASS (3 sizes, 2 weights - 符合规范)
 - [ ] Dimension 5 Spacing: PASS (multiples of 4)
 - [ ] Dimension 6 Registry Safety: PASS (无第三方registry)
 
@@ -564,3 +568,4 @@ html.dark {
 
 *Phase: 18 - Category Display & CLI*
 *UI-SPEC created: 2026-05-09*
+*Typography fixed: 2026-05-09 (3 sizes, 2 weights)*
