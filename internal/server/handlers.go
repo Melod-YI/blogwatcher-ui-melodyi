@@ -380,8 +380,16 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch categories with blog counts for the category management section
+	categories, err := s.db.ListCategoriesWithBlogCount()
+	if err != nil {
+		log.Printf("Error fetching categories: %v", err)
+		categories = nil // Non-blocking - page still works without categories
+	}
+
 	data := map[string]interface{}{
 		"SettingsBlogs":  blogsWithCounts,
+		"Categories":    categories,
 		"IsSettingsPage": true,
 	}
 
@@ -603,8 +611,16 @@ func (s *Server) handleEditBlog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch categories for the dropdown selection
+	categories, err := s.db.ListCategoriesWithBlogCount()
+	if err != nil {
+		log.Printf("Error fetching categories: %v", err)
+		categories = nil
+	}
+
 	data := map[string]interface{}{
-		"Blog": blog,
+		"Blog":       blog,
+		"Categories": categories,
 	}
 	s.renderTemplate(w, "blog-edit-form.gohtml", data)
 }
@@ -633,6 +649,26 @@ func (s *Server) handleUpdateBlogName(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error updating blog %d name: %v", id, err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
+	}
+
+	// Update blog category if provided
+	categoryIDStr := r.FormValue("category_id")
+	var categoryID *int64
+	if categoryIDStr != "" {
+		catID, err := strconv.ParseInt(categoryIDStr, 10, 64)
+		if err != nil {
+			log.Printf("Invalid category ID '%s': %v", categoryIDStr, err)
+			// Non-blocking - ignore invalid category IDs
+		} else {
+			categoryID = &catID
+		}
+	}
+
+	if err := s.db.UpdateBlogCategory(id, categoryID); err != nil {
+		log.Printf("Error updating blog %d category: %v", id, err)
+		// Non-blocking - name update succeeded, category update failed is not fatal
+	} else {
+		log.Printf("Updated blog %d category to %v", id, categoryID)
 	}
 
 	blog, err := s.db.GetBlogByID(id)
