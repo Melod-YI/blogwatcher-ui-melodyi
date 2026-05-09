@@ -674,13 +674,38 @@ func (s *Server) handleUpdateBlogName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.db.UpdateBlogName(id, name); err != nil {
-		log.Printf("Error updating blog %d name: %v", id, err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
+	// 解析 URL 参数（per SETT-05）
+	url := strings.TrimSpace(r.FormValue("url"))
+	feedURL := strings.TrimSpace(r.FormValue("feed_url"))
+
+	// 验证 URL 格式（per SETT-04 和 D-03）
+	if err := validateURL(url); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := validateURL(feedURL); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Update blog category if provided
+	// 获取当前 blog 数据（保留其他字段不变）
+	blog, err := s.db.GetBlogByID(id)
+	if err != nil {
+		log.Printf("Error fetching blog %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if blog == nil {
+		http.Error(w, "Blog not found", http.StatusNotFound)
+		return
+	}
+
+	// 更新字段（per SETT-05）
+	blog.Name = name
+	blog.URL = url
+	blog.FeedURL = feedURL
+
+	// 更新分类（per Phase 17）
 	categoryIDStr := r.FormValue("category_id")
 	var categoryID *int64
 	if categoryIDStr != "" {
@@ -692,24 +717,17 @@ func (s *Server) handleUpdateBlogName(w http.ResponseWriter, r *http.Request) {
 			categoryID = &catID
 		}
 	}
+	blog.CategoryID = categoryID
 
-	if err := s.db.UpdateBlogCategory(id, categoryID); err != nil {
-		log.Printf("Error updating blog %d category: %v", id, err)
-		// Non-blocking - name update succeeded, category update failed is not fatal
-	} else {
-		log.Printf("Updated blog %d category to %v", id, categoryID)
-	}
-
-	blog, err := s.db.GetBlogByID(id)
-	if err != nil {
-		log.Printf("Error fetching updated blog %d: %v", id, err)
+	// 使用 UpdateBlog 一次性更新所有字段（per SETT-05）
+	if err := s.db.UpdateBlog(*blog); err != nil {
+		log.Printf("Error updating blog %d: %v", id, err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
-	if blog == nil {
-		http.Error(w, "Blog not found", http.StatusNotFound)
-		return
-	}
+
+	log.Printf("Updated blog %d: name='%s', url='%s', feed_url='%s', category=%v",
+		id, name, url, feedURL, categoryID)
 
 	articleCount, err := s.db.GetArticleCountForBlog(id)
 	if err != nil {
@@ -999,4 +1017,15 @@ func (s *Server) handleNote(w http.ResponseWriter, r *http.Request) {
 		"Content": content,
 	}
 	s.renderTemplate(w, "note.gohtml", data)
+}
+
+// validateURL 验证 URL 格式（HTTP/HTTPS），空值允许（per D-03a）
+func validateURL(url string) error {
+	if url == "" {
+		return nil // 空值允许（nullable 字段）
+	}
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return fmt.Errorf("URL 必须以 http:// 或 https:// 开头")
+	}
+	return nil
 }

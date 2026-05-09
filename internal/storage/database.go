@@ -805,13 +805,19 @@ func (db *Database) DeleteBlogWithArticles(id int64) error {
 
 // UpdateBlog updates all fields of a blog by ID.
 func (db *Database) UpdateBlog(blog model.Blog) error {
+	var catID sql.NullInt64
+	if blog.CategoryID != nil {
+		catID = sql.NullInt64{Int64: *blog.CategoryID, Valid: true}
+	}
+
 	_, err := db.conn.Exec(
-		`UPDATE blogs SET name = ?, url = ?, feed_url = ?, scrape_selector = ?, last_scanned = ? WHERE id = ?`,
+		`UPDATE blogs SET name = ?, url = ?, feed_url = ?, scrape_selector = ?, last_scanned = ?, category_id = ? WHERE id = ?`,
 		blog.Name,
 		blog.URL,
 		nullIfEmpty(blog.FeedURL),
 		nullIfEmpty(blog.ScrapeSelector),
 		formatTimePtr(blog.LastScanned),
+		catID,
 		blog.ID,
 	)
 	return err
