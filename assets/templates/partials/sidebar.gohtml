@@ -59,14 +59,14 @@
         </a>
     </nav>
 
-    {{/* Subscriptions / Blog list */}}
+    {{/* Subscriptions / Blog list - Category grouped */}}
     <div class="subscriptions-section">
         <div class="nav-section-title">Subscriptions</div>
         <div id="blog-list"
-             hx-get="/blogs"
+             hx-get="/blogs/grouped?blog={{.CurrentBlogID}}"
              hx-trigger="blogListUpdated from:body"
              hx-swap="innerHTML">
-            {{template "blog-list.gohtml" .}}
+            {{template "category-group.gohtml" .}}
         </div>
     </div>
 
