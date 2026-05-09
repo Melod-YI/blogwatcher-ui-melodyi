@@ -1,0 +1,56 @@
+{{define "category-group.gohtml"}}
+{{/* ABOUTME: Renders blogs grouped by category for sidebar.
+     ABOUTME: Categories first (blog_count > 0), uncategorized at the end with separator. */}}
+
+{{/* 分类分组（已在 database 层过滤 blog_count > 0） */}}
+{{range .Grouped.Categories}}
+<div class="category-group" data-category="{{.Name}}">
+	<div class="category-header"
+	     role="button"
+	     aria-expanded="true"
+	     aria-controls="category-blogs-{{.ID}}"
+	     tabindex="0"
+	     hx-on:click="toggleCategory(this)">
+		<svg class="chevron-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<polyline points="6 9 12 15 18 9"></polyline>
+		</svg>
+		<span class="category-name">{{.Name}}</span>
+		<span class="category-count">{{.BlogCount}}</span>
+	</div>
+	<div id="category-blogs-{{.ID}}" class="category-blogs">
+		{{range .Blogs}}
+		<a href="/articles?blog={{.ID}}"
+		   hx-get="/articles?blog={{.ID}}"
+		   hx-target="#main-content"
+		   hx-push-url="true"
+		   hx-on:click="document.querySelectorAll('.sidebar-nav .nav-link, .blog-item').forEach(el => el.classList.remove('active')); this.classList.add('active'); document.getElementById('sidebar-toggle').checked = false;"
+		   class="blog-item{{if eq $.Grouped.CurrentBlogID .ID}} active{{end}}">
+			{{.Name}}
+		</a>
+		{{end}}
+	</div>
+</div>
+{{end}}
+
+{{/* 未分类 blog（分隔线 + "未分类" 标签） */}}
+{{if .Grouped.Uncategorized}}
+<div class="uncategorized-section">
+	<div class="uncategorized-header">未分类</div>
+	{{range .Grouped.Uncategorized}}
+	<a href="/articles?blog={{.ID}}"
+	   hx-get="/articles?blog={{.ID}}"
+	   hx-target="#main-content"
+	   hx-push-url="true"
+	   hx-on:click="document.querySelectorAll('.sidebar-nav .nav-link, .blog-item').forEach(el => el.classList.remove('active')); this.classList.add('active'); document.getElementById('sidebar-toggle').checked = false;"
+	   class="blog-item{{if eq $.Grouped.CurrentBlogID .ID}} active{{end}}">
+		{{.Name}}
+	</a>
+	{{end}}
+</div>
+{{end}}
+
+{{/* 空状态 */}}
+{{if not .Grouped.Categories}}{{if not .Grouped.Uncategorized}}
+<p class="empty-state">No blogs tracked yet. Use the blogwatcher CLI to add blogs.</p>
+{{end}}{{end}}
+{{end}}
