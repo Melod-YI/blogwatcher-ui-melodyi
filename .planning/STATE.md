@@ -4,15 +4,15 @@ milestone: v1.5
 milestone_name: Blog Management Enhancement
 current_phase: 18
 status: executing
-stopped_at: Phase 18 UI-SPEC approved
-last_updated: "2026-05-09T04:13:04.073Z"
-last_activity: 2026-05-09 -- Phase 18 planning complete
+stopped_at: Plan 18-01 complete
+last_updated: "2026-05-09T06:30:00.000Z"
+last_activity: 2026-05-09 -- Plan 18-01: CLI --category filtering complete
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 8
-  completed_plans: 5
-  percent: 63
+  completed_plans: 7
+  percent: 88
 ---
 
 # Project State: BlogWatcher UI
@@ -40,10 +40,10 @@ See: .planning/PROJECT.md (updated 2026-05-08)
 
 ## Current Position
 
-Phase: 17 (category-management-ui) — EXECUTING
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-09 -- Phase 18 planning complete
+Phase: 18 (category-display-cli) — EXECUTING
+Plan: 18-01 complete (CLI --category filtering)
+Status: Ready for next plan (18-02: UI分类分组展示)
+Last activity: 2026-05-09 -- Plan 18-01: CLI --category filtering complete
 
 ## Performance Metrics
 
@@ -176,13 +176,14 @@ None.
 | 2026-02-09 | v1.2 COMPLETE | All 13 requirements delivered |
 | 2026-05-07 | Plan 13-02A complete | Article 和 ArticleWithBlog 模型添加 HasNote 字段 |
 | 2026-05-07 | Plan 13-03 complete | note 命令实现（写入和删除备注文件） |
+| 2026-05-09 | Plan 18-01 complete | CLI article list --category 过滤实现（CATG-10） |
 
 ## Session Continuity
 
-Last session: 2026-05-09T03:48:59.878Z
-Stopped at: Phase 18 UI-SPEC approved
-Resume file: .planning/phases/18-category-display-cli/18-UI-SPEC.md
-Next action: Ready for Phase 14 planning or execution
+Last session: 2026-05-09T06:30:00.000Z
+Stopped at: Plan 18-01 complete
+Resume file: .planning/phases/18-category-display-cli/18-02-PLAN.md
+Next action: Execute Plan 18-02 (UI分类分组展示)
 
 ---
 
