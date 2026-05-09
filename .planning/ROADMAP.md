@@ -579,9 +579,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 18-01-PLAN.md — CLI --category 过滤实现
-- [ ] 18-02-PLAN.md — UI 分类分组展示
-- [ ] 18-03-PLAN.md — 样式和 localStorage 持久化
+- [ ] 19-01-PLAN.md — blog-display-row.gohtml 添加两列 URL 显示（SETT-01）
+- [ ] 19-02-PLAN.md — blog-edit-form.gohtml 添加 URL 输入框和验证（SETT-02~04）
+- [ ] 19-03-PLAN.md — handleUpdateBlogName 处理 URL 参数更新（SETT-05）
 
 ---
 
@@ -610,9 +610,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 18-01-PLAN.md — CLI --category 过滤实现
-- [ ] 18-02-PLAN.md — UI 分类分组展示
-- [ ] 18-03-PLAN.md — 样式和 localStorage 持久化
+- [ ] 20-01-PLAN.md — Add Blog 预览表单和预览按钮（PREV-01）
+- [ ] 20-02-PLAN.md — Feed 解析和文章列表预览（PREV-02~04）
+- [ ] 20-03-PLAN.md — 预览页面保存和返回功能（PREV-05~06）
 
 ---
 
