@@ -191,9 +191,23 @@ func (db *Database) ensureMigrations() error {
 	return nil
 }
 
+// validTableNames is a whitelist of allowed table names for PRAGMA queries.
+// This prevents SQL injection when constructing PRAGMA table_info() queries.
+var validTableNames = map[string]bool{
+	"blogs":     true,
+	"articles":  true,
+	"categories": true,
+}
+
 // columnExists checks if a column exists in a table using PRAGMA table_info.
+// Uses whitelist validation to prevent SQL injection.
 func (db *Database) columnExists(table, column string) bool {
-	rows, err := db.conn.Query("PRAGMA table_info(" + table + ")")
+	// Whitelist validation - only allow known table names
+	if !validTableNames[table] {
+		return false
+	}
+	query := fmt.Sprintf("PRAGMA table_info(%s)", table)
+	rows, err := db.conn.Query(query)
 	if err != nil {
 		return false
 	}
@@ -215,8 +229,14 @@ func (db *Database) columnExists(table, column string) bool {
 }
 
 // columnIsNotNull checks if a column has the NOT NULL constraint.
+// Uses whitelist validation to prevent SQL injection.
 func (db *Database) columnIsNotNull(table, column string) bool {
-	rows, err := db.conn.Query("PRAGMA table_info(" + table + ")")
+	// Whitelist validation - only allow known table names
+	if !validTableNames[table] {
+		return false
+	}
+	query := fmt.Sprintf("PRAGMA table_info(%s)", table)
+	rows, err := db.conn.Query(query)
 	if err != nil {
 		return false
 	}
