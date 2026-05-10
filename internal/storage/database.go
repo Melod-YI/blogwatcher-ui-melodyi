@@ -130,7 +130,7 @@ func (db *Database) ensureMigrations() error {
 	// Add thumbnail_url column if it doesn't exist
 	if !db.columnExists("articles", "thumbnail_url") {
 		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN thumbnail_url TEXT`); err != nil {
-			return err
+			return fmt.Errorf("failed to add thumbnail_url column to articles: %w", err)
 		}
 	}
 
