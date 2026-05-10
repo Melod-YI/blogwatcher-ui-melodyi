@@ -852,7 +852,7 @@ func (db *Database) UpdateBlogLastScanned(id int64, lastScanned time.Time) error
 // AddArticlesBulk inserts multiple articles in a single transaction.
 // Uses INSERT OR IGNORE to silently skip duplicate URLs.
 // Returns the count of inserted and skipped articles.
-func (db *Database) AddArticlesBulk(articles []model.Article) (inserted int, skipped int, error error) {
+func (db *Database) AddArticlesBulk(articles []model.Article) (inserted int, skipped int, err error) {
 	if len(articles) == 0 {
 		return 0, 0, nil
 	}
