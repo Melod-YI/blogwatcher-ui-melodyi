@@ -702,6 +702,12 @@ func (s *Server) handleUpdateBlogName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 记录旧值用于日志对比
+	oldName := blog.Name
+	oldURL := blog.URL
+	oldFeedURL := blog.FeedURL
+	oldCategoryID := blog.CategoryID
+
 	// 更新字段（per SETT-05）
 	blog.Name = name
 	blog.URL = url
@@ -728,8 +734,8 @@ func (s *Server) handleUpdateBlogName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Updated blog %d: name='%s', url='%s', feed_url='%s', category=%v",
-		id, name, url, feedURL, categoryID)
+	log.Printf("Updated blog %d: name='%s' (was '%s'), url='%s' (was '%s'), feed_url='%s' (was '%s'), category=%v (was %v)",
+		id, name, oldName, url, oldURL, feedURL, oldFeedURL, categoryID, oldCategoryID)
 
 	articleCount, err := s.db.GetArticleCountForBlog(id)
 	if err != nil {
