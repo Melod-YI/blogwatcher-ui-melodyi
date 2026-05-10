@@ -144,7 +144,8 @@ func (s *Server) handleArticleList(w http.ResponseWriter, r *http.Request) {
 	data["Version"] = s.version
 	blogs, err := s.db.ListBlogs()
 	if err != nil {
-		log.Printf("Error fetching blogs: %v", err)
+		log.Printf("Error fetching blogs for sidebar: %v", err)
+		data["Blogs"] = []model.Blog{} // 设置空数组避免模板错误
 	} else {
 		data["Blogs"] = blogs
 	}
