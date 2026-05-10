@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -1020,12 +1021,20 @@ func (s *Server) handleNote(w http.ResponseWriter, r *http.Request) {
 }
 
 // validateURL 验证 URL 格式（HTTP/HTTPS），空值允许（per D-03a）
-func validateURL(url string) error {
-	if url == "" {
+// Uses net/url for comprehensive URL validation including scheme and host checks.
+func validateURL(urlStr string) error {
+	if urlStr == "" {
 		return nil // 空值允许（nullable 字段）
 	}
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		return fmt.Errorf("URL 必须以 http:// 或 https:// 开头")
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("URL 格式无效: %v", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("URL 必须使用 http 或 https 协议")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("URL 必须包含主机名")
 	}
 	return nil
 }
