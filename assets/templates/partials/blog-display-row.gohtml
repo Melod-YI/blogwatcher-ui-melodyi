@@ -20,6 +20,9 @@
         </div>
         <div class="blog-settings-meta">
             <span class="article-count">{{.ArticleCount}} article{{if ne .ArticleCount 1}}s{{end}}</span>
+            {{if .CategoryName}}
+            <span class="blog-category"> · {{.CategoryName}}</span>
+            {{end}}
         </div>
     </div>
     <div class="blog-action-buttons">

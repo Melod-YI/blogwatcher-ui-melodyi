@@ -7,7 +7,7 @@ services:
     ports:
       - "19999:8080"
     volumes:
-      - blogwatcher-data:/home/appuser/.blogwatcher
+      - C:\Users\Melodyi\.blogwatcher:/home/appuser/.blogwatcher
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
@@ -64,5 +64,3 @@ services:
       start_period: 5s
 volumes:
   redis-data:
-  blogwatcher-data:
-    driver: local

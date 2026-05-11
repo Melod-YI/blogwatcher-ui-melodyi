@@ -618,9 +618,21 @@ func (s *Server) handleGetBlog(w http.ResponseWriter, r *http.Request) {
 		articleCount = 0
 	}
 
+	// Get category name for display
+	var categoryName string
+	if blog.CategoryID != nil {
+		category, err := s.db.GetCategoryByID(*blog.CategoryID)
+		if err != nil {
+			log.Printf("Error fetching category %d: %v", *blog.CategoryID, err)
+		} else if category != nil {
+			categoryName = category.Name
+		}
+	}
+
 	data := map[string]interface{}{
 		"Blog":         blog,
 		"ArticleCount": articleCount,
+		"CategoryName": categoryName,
 	}
 	s.renderTemplate(w, "blog-display-row.gohtml", data)
 }
@@ -746,12 +758,24 @@ func (s *Server) handleUpdateBlogName(w http.ResponseWriter, r *http.Request) {
 		articleCount = 0
 	}
 
-	// Trigger sidebar refresh via HTMX event
-	w.Header().Set("HX-Trigger", "blogListUpdated")
+	// Get category name for display
+	var categoryName string
+	if blog.CategoryID != nil {
+		category, err := s.db.GetCategoryByID(*blog.CategoryID)
+		if err != nil {
+			log.Printf("Error fetching category %d: %v", *blog.CategoryID, err)
+		} else if category != nil {
+			categoryName = category.Name
+		}
+	}
+
+	// Trigger sidebar and category list refresh via HTMX events
+	w.Header().Set("HX-Trigger", "blogListUpdated, categoryListUpdated")
 
 	data := map[string]interface{}{
 		"Blog":         blog,
 		"ArticleCount": articleCount,
+		"CategoryName": categoryName,
 	}
 	s.renderTemplate(w, "blog-display-row.gohtml", data)
 }
@@ -779,8 +803,8 @@ func (s *Server) handleDeleteBlog(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Deleted blog %d with articles", id)
 
-	// Trigger sidebar refresh via HTMX event
-	w.Header().Set("HX-Trigger", "blogListUpdated")
+	// Trigger sidebar and category list refresh via HTMX events
+	w.Header().Set("HX-Trigger", "blogListUpdated, categoryListUpdated")
 
 	// Return empty response - HTMX will remove the blog card via outerHTML swap
 	w.WriteHeader(http.StatusOK)
@@ -1225,8 +1249,8 @@ func (s *Server) handleBlogPreviewSave(w http.ResponseWriter, r *http.Request) {
 		"PreviewFeedURL":   result.Blog.FeedURL,
 	}
 
-	// Trigger sidebar refresh via HTMX event
-	w.Header().Set("HX-Trigger", "blogListUpdated")
+	// Trigger sidebar and category list refresh via HTMX events
+	w.Header().Set("HX-Trigger", "blogListUpdated, categoryListUpdated")
 
 	s.renderTemplate(w, "settings-page.gohtml", data)
 	log.Printf("handleBlogPreviewSave: completed successfully, redirecting to Settings")

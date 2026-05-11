@@ -1159,7 +1159,7 @@ html:has(#theme-dark:checked) .action-btn-summarize {
 }
 
 .blog-url-column {
-  flex: 1;
+  flex: 0 1 auto; /* Auto width based on content, can shrink */
   min-width: 0; /* Allow text truncation */
 }
 

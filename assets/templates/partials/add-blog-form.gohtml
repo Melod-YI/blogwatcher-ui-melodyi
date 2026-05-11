@@ -47,7 +47,16 @@
                    value="{{.URL}}"
                    placeholder="https://example.com"
                    required>
-            <small>RSS/Atom feed will be auto-discovered</small>
+            <small>RSS/Atom feed will be auto-discovered if Feed URL is not provided</small>
+        </div>
+        <div class="form-group">
+            <label for="feed-url">Feed URL <span class="optional-label">(optional)</span></label>
+            <input type="url"
+                   id="feed-url"
+                   name="feed_url"
+                   value="{{.FeedURL}}"
+                   placeholder="https://example.com/feed.xml">
+            <small>Provide RSS/Atom feed URL to skip auto-discovery</small>
         </div>
         <div class="form-actions">
             <button type="button"
