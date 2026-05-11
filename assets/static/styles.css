@@ -1284,6 +1284,39 @@ html:has(#theme-dark:checked) .action-btn-summarize {
   display: block; /* 验证失败时显示 */
 }
 
+/* Blog Edit Category - 分类选择下拉框样式 */
+.blog-edit-category {
+  margin-bottom: 16px;
+}
+
+.blog-edit-category select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 8px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 32px;
+}
+
+.blog-edit-category select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.blog-edit-category select:hover {
+  border-color: var(--accent);
+}
+
 .blog-edit-actions {
   display: flex;
   gap: 0.5rem;
