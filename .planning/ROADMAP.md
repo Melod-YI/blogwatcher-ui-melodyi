@@ -607,12 +607,12 @@ Plans:
 
 **Depends on:** Phase 19 (Blog Settings Enhancement)
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 20-01-PLAN.md — Add Blog 预览表单和预览按钮（PREV-01）
-- [ ] 20-02-PLAN.md — Feed 解析和文章列表预览（PREV-02~04）
-- [ ] 20-03-PLAN.md — 预览页面保存和返回功能（PREV-05~06）
+- [x] 20-01-PLAN.md — Add Blog 预览表单和预览按钮（PREV-01）
+- [x] 20-02-PLAN.md — Feed 解析和文章列表预览（PREV-02~04）
+- [x] 20-03-PLAN.md — 预览页面保存和返回功能（PREV-05~06）
 
 ---
 
