@@ -64,9 +64,9 @@
         <div class="nav-section-title">Subscriptions</div>
         <div id="blog-list"
              hx-get="/blogs/grouped?blog={{.CurrentBlogID}}"
-             hx-trigger="blogListUpdated from:body"
+             hx-trigger="load, blogListUpdated from:body"
              hx-swap="innerHTML">
-            {{template "category-group.gohtml" .}}
+            {{/* Initial content will be replaced by HTMX on load */}}
         </div>
     </div>
 
