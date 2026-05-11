@@ -50,7 +50,15 @@
             <small>RSS/Atom feed will be auto-discovered</small>
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn-action">
+            <button type="button"
+                    class="btn-action"
+                    hx-post="/blogs/preview"
+                    hx-target="#add-blog-form-container"
+                    hx-swap="innerHTML"
+                    hx-include="closest form">
+                Preview
+            </button>
+            <button type="submit" class="btn-action btn-primary">
                 <span class="btn-text">Add Blog</span>
                 <span class="add-blog-spinner htmx-indicator">Adding...</span>
             </button>
