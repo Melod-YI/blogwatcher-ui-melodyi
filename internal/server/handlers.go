@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/rss"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/scanner"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/service"
 )
@@ -744,4 +746,126 @@ func (s *Server) handleNote(w http.ResponseWriter, r *http.Request) {
 		"Content": content,
 	}
 	s.renderTemplate(w, "note.gohtml", data)
+}
+
+// handleBlogPreview handles the Preview button, parses Feed URL and returns preview page.
+// PREV-02: Click Preview triggers temporary feed parse
+// PREV-03: Preview page shows parsed article list (max 20)
+// PREV-04: Preview failure shows error message
+func (s *Server) handleBlogPreview(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.FormValue("name"))
+	blogURL := strings.TrimSpace(r.FormValue("url"))
+
+	log.Printf("handleBlogPreview: entry - name='%s', url='%s'", name, blogURL)
+
+	// Basic validation
+	if name == "" || blogURL == "" {
+		log.Printf("handleBlogPreview: validation failed - name or url empty")
+		data := map[string]interface{}{
+			"Error":    "Blog name and URL are required",
+			"BlogName": name,
+			"BlogURL":  blogURL,
+		}
+		s.renderTemplate(w, "preview-page.gohtml", data)
+		return
+	}
+
+	// URL format validation (per D-03)
+	if err := validateURL(blogURL); err != nil {
+		log.Printf("handleBlogPreview: URL validation failed - %v", err)
+		data := map[string]interface{}{
+			"Error":    err.Error(),
+			"BlogName": name,
+			"BlogURL":  blogURL,
+		}
+		s.renderTemplate(w, "preview-page.gohtml", data)
+		return
+	}
+
+	// Create context with timeout for external HTTP requests
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	// Discover Feed URL (same logic as handleAddBlog)
+	log.Printf("handleBlogPreview: discovering feed URL for '%s'", blogURL)
+	feedURL, _ := rss.DiscoverFeedURL(ctx, blogURL)
+	if feedURL == "" {
+		log.Printf("handleBlogPreview: no feed URL discovered for '%s'", blogURL)
+		data := map[string]interface{}{
+			"Error":    "No RSS/Atom feed found at this URL. Please check the URL or provide a valid feed URL.",
+			"BlogName": name,
+			"BlogURL":  blogURL,
+			"FeedURL":  "",
+		}
+		s.renderTemplate(w, "preview-page.gohtml", data)
+		return
+	}
+
+	log.Printf("handleBlogPreview: discovered feed URL '%s' for blog '%s' at '%s'", feedURL, name, blogURL)
+
+	// Parse Feed (PREV-02)
+	articles, err := rss.ParseFeed(ctx, feedURL)
+	if err != nil {
+		log.Printf("handleBlogPreview: failed to parse feed '%s': %v", feedURL, err)
+		var errorMsg string
+		if rss.IsFeedError(err) {
+			var parseErr rss.FeedParseError
+			if errors.As(err, &parseErr) {
+				errorMsg = parseErr.Message
+			} else {
+				errorMsg = err.Error()
+			}
+		} else {
+			errorMsg = fmt.Sprintf("Failed to parse feed: %v", err)
+		}
+		data := map[string]interface{}{
+			"Error":    errorMsg,
+			"BlogName": name,
+			"BlogURL":  blogURL,
+			"FeedURL":  feedURL,
+		}
+		s.renderTemplate(w, "preview-page.gohtml", data)
+		return
+	}
+
+	// Limit to 20 articles (PREV-03)
+	totalCount := len(articles)
+	displayedCount := totalCount
+	if totalCount > 20 {
+		articles = articles[:20]
+		displayedCount = 20
+	}
+
+	log.Printf("handleBlogPreview: parsed %d articles from feed '%s' (showing %d)", totalCount, feedURL, displayedCount)
+
+	// Success: render preview page
+	data := map[string]interface{}{
+		"BlogName":       name,
+		"BlogURL":        blogURL,
+		"FeedURL":        feedURL,
+		"Articles":       articles,
+		"TotalCount":     totalCount,
+		"DisplayedCount": displayedCount,
+	}
+	s.renderTemplate(w, "preview-page.gohtml", data)
+	log.Printf("handleBlogPreview: completed successfully")
+}
+
+// validateURL checks that a URL string is a valid HTTP or HTTPS URL.
+// Returns an error if the URL is empty, invalid format, or not HTTP/HTTPS.
+func validateURL(urlStr string) error {
+	if urlStr == "" {
+		return fmt.Errorf("URL is required")
+	}
+	parsed, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %v", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("URL must use HTTP or HTTPS protocol")
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("URL must have a host")
+	}
+	return nil
 }
