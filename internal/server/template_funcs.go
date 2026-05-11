@@ -78,3 +78,13 @@ func faviconURL(blogURL string) string {
 	}
 	return fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s&sz=32", u.Host)
 }
+
+// ptrEq compares a pointer to an int64 value.
+// Returns true if ptr is non-nil and dereferenced value equals v.
+// Used for comparing Blog.CategoryID (*int64) with Category.ID (int64).
+func ptrEq(ptr *int64, v int64) bool {
+	if ptr == nil {
+		return false
+	}
+	return *ptr == v
+}

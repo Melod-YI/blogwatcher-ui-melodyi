@@ -38,6 +38,7 @@ func NewServerWithFS(db *storage.Database, templateFS fs.FS, staticFS fs.FS, ver
 		"faviconURL":    faviconURL,
 		"smryURL":       smryURL,
 		"renderMarkdown": renderMarkdown,
+		"ptrEq":         ptrEq, // Compare *int64 with int64 (for CategoryID matching)
 	}
 
 	// Parse all templates once at startup from embedded filesystem

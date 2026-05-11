@@ -30,6 +30,7 @@
 
         <!-- Category dropdown (refreshes when new categories are created) -->
         <div class="blog-edit-category">
+            <label class="edit-label">Category</label>
             <select name="category_id"
                     hx-trigger="categoryListUpdated from:body"
                     hx-get="/blogs/{{.Blog.ID}}/edit"
@@ -38,7 +39,7 @@
                 <option value="">-- 未分类 --</option>
                 {{range .Categories}}
                 <option value="{{.ID}}"
-                        {{if eq $.Blog.CategoryID .ID}}selected{{end}}>
+                        {{if ptrEq $.Blog.CategoryID .ID}}selected{{end}}>
                     {{.Name}}
                 </option>
                 {{end}}
