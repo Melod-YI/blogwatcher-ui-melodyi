@@ -213,6 +213,49 @@ func ScanAllBlogs(ctx context.Context, db *storage.Database) ([]ScanResult, erro
 	return results, nil
 }
 
+// ScanBlogsByCategory scans all blogs belonging to a specific category.
+// Uses the same concurrent scanning logic as ScanAllBlogs.
+func ScanBlogsByCategory(ctx context.Context, db *storage.Database, categoryID int64) ([]ScanResult, error) {
+	blogs, err := db.ListBlogsByCategoryID(categoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(blogs) == 0 {
+		return nil, nil
+	}
+
+	results := make([]ScanResult, len(blogs))
+	resultCh := make(chan struct {
+		Index  int
+		Result ScanResult
+	}, len(blogs))
+
+	var wg sync.WaitGroup
+	for i, blog := range blogs {
+		wg.Add(1)
+		go func(index int, b model.Blog) {
+			defer wg.Done()
+			result := ScanBlog(ctx, db, b)
+			resultCh <- struct {
+				Index  int
+				Result ScanResult
+			}{Index: index, Result: result}
+		}(i, blog)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	for item := range resultCh {
+		results[item.Index] = item.Result
+	}
+
+	return results, nil
+}
+
 func ScanBlogByName(ctx context.Context, db *storage.Database, name string) (*ScanResult, error) {
 	blog, err := db.GetBlogByName(name)
 	if err != nil {

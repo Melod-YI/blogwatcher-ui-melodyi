@@ -362,7 +362,8 @@ func (db *Database) ListBlogs() ([]model.Blog, error) {
 // BlogWithCount extends Blog with article count for settings display.
 type BlogWithCount struct {
 	model.Blog
-	ArticleCount int
+	ArticleCount  int
+	CategoryName  string // 分类名称（用于显示）
 }
 
 // CategoryWithBlogCount extends Category with blog count for display.
@@ -387,6 +388,7 @@ type GroupedSidebarData struct {
 
 // ListBlogsWithCounts returns all blogs with their article counts.
 // Uses LEFT JOIN to include blogs with zero articles.
+// LEFT JOIN categories to include category name for display.
 func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
 	query := `SELECT
 		b.id,
@@ -396,10 +398,12 @@ func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
 		b.scrape_selector,
 		b.last_scanned,
 		b.category_id,
+		c.name as category_name,
 		COUNT(a.id) as article_count
 	FROM blogs b
 	LEFT JOIN articles a ON b.id = a.blog_id
-	GROUP BY b.id, b.name, b.url, b.feed_url, b.scrape_selector, b.last_scanned, b.category_id
+	LEFT JOIN categories c ON b.category_id = c.id
+	GROUP BY b.id, b.name, b.url, b.feed_url, b.scrape_selector, b.last_scanned, b.category_id, c.name
 	ORDER BY b.name`
 
 	rows, err := db.conn.Query(query)
@@ -418,9 +422,100 @@ func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
 			scrapeSelector sql.NullString
 			lastScanned    sql.NullString
 			categoryID     sql.NullInt64
+			categoryName   sql.NullString
 			articleCount   int
 		)
-		if err := rows.Scan(&id, &name, &url, &feedURL, &scrapeSelector, &lastScanned, &categoryID, &articleCount); err != nil {
+		if err := rows.Scan(&id, &name, &url, &feedURL, &scrapeSelector, &lastScanned, &categoryID, &categoryName, &articleCount); err != nil {
+			return nil, err
+		}
+
+		blog := BlogWithCount{
+			Blog: model.Blog{
+				ID:             id,
+				Name:           name,
+				URL:            url,
+				FeedURL:        feedURL.String,
+				ScrapeSelector: scrapeSelector.String,
+			},
+			ArticleCount:  articleCount,
+			CategoryName:  categoryName.String,
+		}
+		if lastScanned.Valid {
+			if parsed, err := parseTime(lastScanned.String); err == nil {
+				blog.LastScanned = &parsed
+			}
+		}
+		if categoryID.Valid {
+			blog.CategoryID = &categoryID.Int64
+		}
+		blogs = append(blogs, blog)
+	}
+	return blogs, rows.Err()
+}
+
+// ListBlogsByCategoryID returns blogs belonging to a specific category.
+// Returns empty slice if category has no blogs.
+func (db *Database) ListBlogsByCategoryID(categoryID int64) ([]model.Blog, error) {
+	query := `SELECT id, name, url, feed_url, scrape_selector, last_scanned, category_id
+		FROM blogs WHERE category_id = ? ORDER BY name`
+	rows, err := db.conn.Query(query, categoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var blogs []model.Blog
+	for rows.Next() {
+		blog, err := scanBlog(rows)
+		if err != nil {
+			return nil, err
+		}
+		if blog != nil {
+			blogs = append(blogs, *blog)
+		}
+	}
+	return blogs, rows.Err()
+}
+
+// ListBlogsWithCountsByCategoryID returns blogs with article counts for a specific category.
+func (db *Database) ListBlogsWithCountsByCategoryID(categoryID int64) ([]BlogWithCount, error) {
+	query := `SELECT
+		b.id,
+		b.name,
+		b.url,
+		b.feed_url,
+		b.scrape_selector,
+		b.last_scanned,
+		b.category_id,
+		c.name as category_name,
+		COUNT(a.id) as article_count
+	FROM blogs b
+	LEFT JOIN articles a ON b.id = a.blog_id
+	LEFT JOIN categories c ON b.category_id = c.id
+	WHERE b.category_id = ?
+	GROUP BY b.id, b.name, b.url, b.feed_url, b.scrape_selector, b.last_scanned, b.category_id, c.name
+	ORDER BY b.name`
+
+	rows, err := db.conn.Query(query, categoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var blogs []BlogWithCount
+	for rows.Next() {
+		var (
+			id             int64
+			name           string
+			url            string
+			feedURL        sql.NullString
+			scrapeSelector sql.NullString
+			lastScanned    sql.NullString
+			categoryID     sql.NullInt64
+			categoryName   sql.NullString
+			articleCount   int
+		)
+		if err := rows.Scan(&id, &name, &url, &feedURL, &scrapeSelector, &lastScanned, &categoryID, &categoryName, &articleCount); err != nil {
 			return nil, err
 		}
 
@@ -433,6 +528,7 @@ func (db *Database) ListBlogsWithCounts() ([]BlogWithCount, error) {
 				ScrapeSelector: scrapeSelector.String,
 			},
 			ArticleCount: articleCount,
+			CategoryName: categoryName.String,
 		}
 		if lastScanned.Valid {
 			if parsed, err := parseTime(lastScanned.String); err == nil {
@@ -699,6 +795,12 @@ func (db *Database) GetBlogByName(name string) (*model.Blog, error) {
 // GetCategoryByName returns a category by its name, or nil if not found.
 func (db *Database) GetCategoryByName(name string) (*model.Category, error) {
 	row := db.conn.QueryRow(`SELECT id, name, created_at FROM categories WHERE name = ?`, name)
+	return scanCategory(row)
+}
+
+// GetCategoryByID returns a category by its ID, or nil if not found.
+func (db *Database) GetCategoryByID(id int64) (*model.Category, error) {
+	row := db.conn.QueryRow(`SELECT id, name, created_at FROM categories WHERE id = ?`, id)
 	return scanCategory(row)
 }
 
@@ -1045,11 +1147,11 @@ func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.A
 		publishedDate sql.NullString
 		discovered    sql.NullString
 		isRead        bool
+		hasNote       bool
 		blogName      string
 		blogURL       string
-		hasNote       bool
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &blogName, &blogURL, &hasNote); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &blogName, &blogURL); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}

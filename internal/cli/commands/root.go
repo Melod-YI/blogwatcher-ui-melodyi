@@ -36,6 +36,8 @@ func init() {
 	rootCmd.AddCommand(NewArticleCmd())
 	// 添加 note 子命令
 	rootCmd.AddCommand(NewNoteCmd())
+	// 添加 category 子命令
+	rootCmd.AddCommand(NewCategoryCmd())
 }
 
 // Execute 执行根命令
