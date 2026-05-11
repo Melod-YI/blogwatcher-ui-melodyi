@@ -1131,6 +1131,105 @@ func (s *Server) handleBlogPreview(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handleBlogPreview: completed successfully")
 }
 
+// handleBlogPreviewSave handles the Save as Blog button from preview page.
+// PREV-05: 预览页面有保存按钮（保存为正式 blog）
+// PREV-06: 预览页面有返回修改按钮（返回添加表单）
+// D-04: 保存成功后跳转到 Settings 页面显示成功消息
+func (s *Server) handleBlogPreviewSave(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.FormValue("name"))
+	blogURL := strings.TrimSpace(r.FormValue("url"))
+	feedURL := strings.TrimSpace(r.FormValue("feed_url"))
+
+	log.Printf("handleBlogPreviewSave: name=%s, url=%s, feed_url=%s", name, blogURL, feedURL)
+
+	// Basic validation
+	if name == "" || blogURL == "" {
+		log.Printf("handleBlogPreviewSave: validation failed - name or url empty")
+		data := map[string]interface{}{
+			"Error":    "Blog name and URL are required",
+			"BlogName": name,
+			"BlogURL":  blogURL,
+			"FeedURL":  feedURL,
+		}
+		s.renderTemplate(w, "preview-page.gohtml", data)
+		return
+	}
+
+	// URL format validation
+	if err := validateURL(blogURL); err != nil {
+		log.Printf("handleBlogPreviewSave: URL validation failed - %v", err)
+		data := map[string]interface{}{
+			"Error":    err.Error(),
+			"BlogName": name,
+			"BlogURL":  blogURL,
+			"FeedURL":  feedURL,
+		}
+		s.renderTemplate(w, "preview-page.gohtml", data)
+		return
+	}
+
+	// Use service layer for business logic (same as handleAddBlog)
+	input := service.AddBlogInput{
+		Name:    name,
+		URL:     blogURL,
+		FeedURL: feedURL, // May be empty if preview failed
+	}
+
+	result, err := s.blogService.AddBlog(r.Context(), input)
+	if err != nil {
+		var dupErr service.BlogAlreadyExistsError
+		if errors.As(err, &dupErr) {
+			log.Printf("handleBlogPreviewSave: duplicate blog - %v", dupErr)
+			data := map[string]interface{}{
+				"Error":    dupErr.Error(),
+				"BlogName": name,
+				"BlogURL":  blogURL,
+				"FeedURL":  feedURL,
+			}
+			s.renderTemplate(w, "preview-page.gohtml", data)
+			return
+		}
+		// Unexpected error
+		log.Printf("handleBlogPreviewSave: error saving blog - %v", err)
+		data := map[string]interface{}{
+			"Error":    "Failed to save blog",
+			"BlogName": name,
+			"BlogURL":  blogURL,
+			"FeedURL":  feedURL,
+		}
+		s.renderTemplate(w, "preview-page.gohtml", data)
+		return
+	}
+
+	log.Printf("handleBlogPreviewSave: saved blog '%s' with feed %s (ID=%d)", result.Blog.Name, result.Blog.FeedURL, result.Blog.ID)
+
+	// Auto-sync the new blog in background (same as handleAddBlog)
+	go s.autoSyncNewBlog(result.Blog.Name)
+
+	// D-04: 跳转到 Settings 页面
+	// Fetch settings data with success message
+	blogsWithCounts, err := s.db.ListBlogsWithCounts()
+	if err != nil {
+		log.Printf("handleBlogPreviewSave: error fetching blogs with counts - %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"SettingsBlogs":    blogsWithCounts,
+		"IsSettingsPage":   true,
+		"PreviewSuccess":   true,
+		"PreviewBlogName":  result.Blog.Name,
+		"PreviewFeedURL":   result.Blog.FeedURL,
+	}
+
+	// Trigger sidebar refresh via HTMX event
+	w.Header().Set("HX-Trigger", "blogListUpdated")
+
+	s.renderTemplate(w, "settings-page.gohtml", data)
+	log.Printf("handleBlogPreviewSave: completed successfully, redirecting to Settings")
+}
+
 // validateURL 验证 URL 格式（HTTP/HTTPS），空值允许（per D-03a）
 // Uses net/url for comprehensive URL validation including scheme and host checks.
 func validateURL(urlStr string) error {

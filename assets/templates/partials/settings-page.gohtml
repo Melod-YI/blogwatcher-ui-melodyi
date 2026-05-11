@@ -5,6 +5,15 @@
     </header>
 </div>
 <div class="main-content-body">
+    {{if .PreviewSuccess}}
+    <div class="success-message preview-success">
+        <p><strong>Successfully added '{{.PreviewBlogName}}'</strong></p>
+        {{if .PreviewFeedURL}}
+        <p class="feed-url-info">Feed: {{.PreviewFeedURL}}</p>
+        {{end}}
+        <p class="sync-info">Articles are being fetched in the background. You can navigate away safely.</p>
+    </div>
+    {{end}}
     {{template "add-blog-form.gohtml" .}}
 
     <!-- Category management section (shown before Tracked Blogs per D-01) -->
