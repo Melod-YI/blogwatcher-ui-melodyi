@@ -1,0 +1,35 @@
+{{define "preview-article-card.gohtml"}}
+{{/* ABOUTME: Renders a single article card for the preview page.
+     ABOUTME: Shows title, published time, and external link icon. */}}
+<article class="article-card preview-article">
+    {{if .ThumbnailURL}}
+    <img class="article-thumbnail"
+         src="{{.ThumbnailURL}}"
+         alt=""
+         width="120"
+         height="80"
+         loading="lazy"
+         onerror="this.style.display='none';">
+    {{end}}
+    <div class="article-content">
+        <a href="{{.URL}}"
+           target="_blank"
+           rel="noopener noreferrer"
+           class="article-title stretched-link">
+            {{.Title}}
+        </a>
+        <div class="article-meta">
+            {{if .PublishedDate}}
+            <span class="article-time">{{timeAgo .PublishedDate}}</span>
+            {{end}}
+            <a href="{{.URL}}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="preview-open-link"
+               onclick="event.stopPropagation();">
+                Open
+            </a>
+        </div>
+    </div>
+</article>
+{{end}}

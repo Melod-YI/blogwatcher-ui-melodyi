@@ -30,6 +30,7 @@ func (s *Server) registerRoutes() {
 
 	// Blog management
 	s.mux.HandleFunc("POST /blogs/add", s.handleAddBlog)
+	s.mux.HandleFunc("POST /blogs/preview", s.handleBlogPreview) // PREV-02~04: Preview feed before adding
 	s.mux.HandleFunc("GET /blogs/{id}", s.handleGetBlog)
 	s.mux.HandleFunc("GET /blogs/{id}/edit", s.handleEditBlog)
 	s.mux.HandleFunc("PUT /blogs/{id}", s.handleUpdateBlogName)
