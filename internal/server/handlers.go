@@ -520,10 +520,10 @@ func parseSearchOptions(r *http.Request) (model.SearchOptions, string, int64) {
 func (s *Server) handleAddBlog(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	url := strings.TrimSpace(r.FormValue("url"))
-
+	feedURL := strings.TrimSpace(r.FormValue("feed_url"))
 	// Basic validation
 	if name == "" || url == "" {
-		s.renderAddBlogError(w, "Blog name and URL are required", name, url)
+		s.renderAddBlogError(w, "Blog name and URL are required", name, url, feedURL)
 		return
 	}
 
@@ -531,6 +531,7 @@ func (s *Server) handleAddBlog(w http.ResponseWriter, r *http.Request) {
 	input := service.AddBlogInput{
 		Name: name,
 		URL:  url,
+		FeedURL: feedURL,
 	}
 
 	result, err := s.blogService.AddBlog(r.Context(), input)
@@ -538,12 +539,12 @@ func (s *Server) handleAddBlog(w http.ResponseWriter, r *http.Request) {
 		// Check for domain errors
 		var dupErr service.BlogAlreadyExistsError
 		if errors.As(err, &dupErr) {
-			s.renderAddBlogError(w, dupErr.Error(), name, url)
+			s.renderAddBlogError(w, dupErr.Error(), name, url, feedURL)
 			return
 		}
 		// Unexpected error
 		log.Printf("Error adding blog: %v", err)
-		s.renderAddBlogError(w, "Failed to add blog", name, url)
+		s.renderAddBlogError(w, "Failed to add blog", name, url, feedURL)
 		return
 	}
 
@@ -571,11 +572,12 @@ func (s *Server) autoSyncNewBlog(blogName string) {
 }
 
 // renderAddBlogError renders the add blog form with an error message
-func (s *Server) renderAddBlogError(w http.ResponseWriter, message, name, url string) {
+func (s *Server) renderAddBlogError(w http.ResponseWriter, message, name, url, feedURL string) {
 	data := map[string]interface{}{
-		"Error": message,
-		"Name":  name, // Pre-populate form
-		"URL":   url,  // Pre-populate form
+		"Error":   message,
+		"Name":    name,    // Pre-populate form
+		"URL":     url,     // Pre-populate form
+		"FeedURL": feedURL, // Pre-populate form
 	}
 	s.renderTemplate(w, "add-blog-form.gohtml", data)
 }

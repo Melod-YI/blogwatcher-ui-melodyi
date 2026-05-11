@@ -24,49 +24,7 @@
         {{if .SettingsBlogs}}
         <div class="blog-settings-list">
             {{range .SettingsBlogs}}
-            <div class="blog-settings-card" id="blog-{{.ID}}">
-                <div class="blog-settings-info">
-                    <h3 class="blog-settings-name">{{.Name}}</h3>
-                    <a href="{{.URL}}" target="_blank" rel="noopener noreferrer"
-                       class="blog-settings-url">{{.URL}}</a>
-                    <div class="blog-settings-meta">
-                        <span class="article-count">{{.ArticleCount}} article{{if ne .ArticleCount 1}}s{{end}}</span>
-                    </div>
-                </div>
-                <div class="blog-action-buttons">
-                    <button type="button" class="btn-action"
-                            hx-get="/blogs/{{.ID}}/edit"
-                            hx-target="#blog-{{.ID}}"
-                            hx-swap="outerHTML">
-                        Edit
-                    </button>
-                    <button type="button" class="btn-action btn-danger"
-                            onclick="document.getElementById('delete-blog-{{.ID}}').showModal()">
-                        Remove
-                    </button>
-                </div>
-                <dialog id="delete-blog-{{.ID}}" class="delete-blog-dialog">
-                    <h2>Delete Blog?</h2>
-                    <p class="blog-name">{{.Name}}</p>
-                    <p class="article-count-warning">
-                        This will delete the blog and its <strong>{{.ArticleCount}} article{{if ne .ArticleCount 1}}s{{end}}</strong>.
-                    </p>
-                    <p class="warning-text">This action cannot be undone.</p>
-                    <div class="dialog-buttons">
-                        <button type="button" class="btn-action btn-danger"
-                                hx-delete="/blogs/{{.ID}}"
-                                hx-target="#blog-{{.ID}}"
-                                hx-swap="outerHTML"
-                                onclick="this.closest('dialog').close()">
-                            Delete
-                        </button>
-                        <button type="button" class="btn-action btn-secondary"
-                                onclick="this.closest('dialog').close()">
-                            Cancel
-                        </button>
-                    </div>
-                </dialog>
-            </div>
+            {{template "blog-display-row.gohtml" .}}
             {{end}}
         </div>
         {{else}}
