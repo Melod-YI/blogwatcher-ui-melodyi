@@ -1993,3 +1993,159 @@ html.dark {
   text-transform: uppercase;
   margin-bottom: 8px;
 }
+
+/* ============================================
+   Category Management Styles (Settings Page)
+   ============================================ */
+
+.category-section {
+  margin-bottom: 2rem;
+}
+
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.category-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.category-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.category-name:hover {
+  background: var(--bg-surface);
+}
+
+.category-count {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.category-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Category Edit/Add Form Styles - matches blog-settings-card style */
+.category-add-mode,
+.category-edit-mode {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.category-edit-form {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.5rem 0;
+}
+
+.category-edit-input {
+  flex: 1;
+  max-width: 300px;
+}
+
+.category-edit-form input[type="text"] {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.category-edit-form input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.category-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.category-edit-form input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.category-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Add Category Button */
+.btn-add-category {
+  margin-top: 0.5rem;
+}
+
+/* Delete Category Dialog */
+.delete-category-dialog {
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: none;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  max-width: 400px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.delete-category-dialog h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.delete-category-dialog .category-name {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.delete-category-dialog .blog-count-warning {
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.delete-category-dialog .warning-text {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 1.5rem;
+}
+
+.delete-category-dialog .dialog-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.delete-category-dialog .dialog-buttons .btn-action {
+  flex: 1;
+  justify-content: center;
+}

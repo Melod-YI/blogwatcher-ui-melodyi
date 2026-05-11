@@ -20,7 +20,8 @@
     <button type="button" class="btn-action btn-add-category"
             hx-get="/categories/new"
             hx-target="#category-list"
-            hx-swap="beforeend">
+            hx-swap="beforeend"
+            hx-on:click="this.style.display = 'none'">
         + New Category
     </button>
 </section>

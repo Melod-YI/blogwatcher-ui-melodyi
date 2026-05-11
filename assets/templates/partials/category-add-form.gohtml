@@ -1,9 +1,10 @@
 {{define "category-add-form.gohtml"}}
-<div class="category-item category-add-mode">
-    <form class="category-add-form"
+<div class="category-item category-add-mode" id="category-add-form">
+    <form class="category-edit-form"
           hx-post="/categories"
-          hx-target="this"
-          hx-swap="outerHTML">
+          hx-target="#category-add-form"
+          hx-swap="outerHTML"
+          hx-on::after-settle="document.querySelector('.btn-add-category').style.display = ''">
         <div class="category-edit-input">
             <input type="text" name="name"
                    maxlength="100" required autofocus
@@ -12,9 +13,7 @@
         <div class="category-edit-actions">
             <button type="submit" class="btn-action btn-save">Save</button>
             <button type="button" class="btn-action btn-cancel"
-                    hx-get="/categories/list"
-                    hx-target="this"
-                    hx-swap="outerHTML">
+                    onclick="this.closest('#category-add-form').remove(); document.querySelector('.btn-add-category').style.display = ''">
                 Cancel
             </button>
         </div>
