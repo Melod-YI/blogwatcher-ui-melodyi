@@ -1,0 +1,61 @@
+{{define "preview-page.gohtml"}}
+{{/* ABOUTME: Renders preview page showing parsed feed articles.
+     ABOUTME: Supports success case (article list) and error case (inline error). */}}
+<div id="add-blog-form-container" class="preview-section">
+    <h2>Preview: {{.BlogName}}</h2>
+
+    {{if .Error}}
+    <!-- Error case (D-03) -->
+    <div class="error-message">
+        <p><strong>Feed parse failed</strong></p>
+        <p>{{.Error}}</p>
+    </div>
+    <div class="preview-actions">
+        <button type="button"
+                class="btn-action btn-secondary"
+                hx-get="/settings"
+                hx-target="#main-content"
+                hx-swap="innerHTML">
+            Back to Edit
+        </button>
+        <button type="button"
+                class="btn-action"
+                hx-post="/blogs/preview/save"
+                hx-target="#add-blog-form-container"
+                hx-swap="innerHTML"
+                hx-vals='{"name": "{{.BlogName}}", "url": "{{.BlogURL}}"}'>
+            Save Anyway
+        </button>
+    </div>
+    {{else}}
+    <!-- Success case (D-02) -->
+    <div class="preview-info">
+        {{if gt .TotalCount .DisplayedCount}}
+        <p class="preview-count">Showing {{.DisplayedCount}} of {{.TotalCount}} articles</p>
+        {{end}}
+    </div>
+    <div class="preview-article-list">
+        {{range .Articles}}
+        {{template "preview-article-card.gohtml" .}}
+        {{end}}
+    </div>
+    <div class="preview-actions">
+        <button type="button"
+                class="btn-action btn-secondary"
+                hx-get="/settings"
+                hx-target="#main-content"
+                hx-swap="innerHTML">
+            Back to Edit
+        </button>
+        <button type="button"
+                class="btn-action btn-primary"
+                hx-post="/blogs/preview/save"
+                hx-target="#add-blog-form-container"
+                hx-swap="innerHTML"
+                hx-vals='{"name": "{{.BlogName}}", "url": "{{.BlogURL}}", "feed_url": "{{.FeedURL}}"}'>
+            Save as Blog
+        </button>
+    </div>
+    {{end}}
+</div>
+{{end}}
