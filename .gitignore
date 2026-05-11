@@ -1,3 +1,7 @@
 .reference/
 .claude-visual/
 /server
+.claude
+.superpowers
+.planning/
+*.exe
