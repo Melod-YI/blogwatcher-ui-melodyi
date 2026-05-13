@@ -17,12 +17,18 @@
                 <span class="blog-settings-url blog-settings-url-empty">—</span>
                 {{end}}
             </div>
-        </div>
-        <div class="blog-settings-meta">
-            <span class="article-count">{{.ArticleCount}} article{{if ne .ArticleCount 1}}s{{end}}</span>
-            {{if .CategoryName}}
-            <span class="blog-category"> · {{.CategoryName}}</span>
-            {{end}}
+            <div class="blog-url-column">
+                <span class="url-label">Articles</span>
+                <span class="blog-settings-url">{{.ArticleCount}}</span>
+            </div>
+            <div class="blog-url-column">
+                <span class="url-label">Category</span>
+                {{if .CategoryName}}
+                <span class="blog-settings-url">{{.CategoryName}}</span>
+                {{else}}
+                <span class="blog-settings-url blog-settings-url-empty">—</span>
+                {{end}}
+            </div>
         </div>
     </div>
     <div class="blog-action-buttons">
