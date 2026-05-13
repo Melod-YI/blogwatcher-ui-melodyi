@@ -404,6 +404,7 @@ func (s *Server) handleAPISync(w http.ResponseWriter, r *http.Request) {
 
 // handleSettings serves the settings page showing all blogs with article counts
 // Returns partial fragment for HTMX requests, full page otherwise
+// Supports query params: preview_success, blog_name, feed_url for success message
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	blogsWithCounts, err := s.db.ListBlogsWithCounts()
 	if err != nil {
@@ -423,6 +424,14 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"SettingsBlogs":  blogsWithCounts,
 		"Categories":    categories,
 		"IsSettingsPage": true,
+	}
+
+	// Check for preview success query params
+	if r.URL.Query().Get("preview_success") == "true" {
+		data["PreviewSuccess"] = true
+		data["PreviewBlogName"] = r.URL.Query().Get("blog_name")
+		data["PreviewFeedURL"] = r.URL.Query().Get("feed_url")
+		log.Printf("handleSettings: showing preview success message for blog '%s'", data["PreviewBlogName"])
 	}
 
 	// Check if this is an HTMX request
@@ -1232,27 +1241,15 @@ func (s *Server) handleBlogPreviewSave(w http.ResponseWriter, r *http.Request) {
 	// Auto-sync the new blog in background (same as handleAddBlog)
 	go s.autoSyncNewBlog(result.Blog.Name)
 
-	// D-04: 跳转到 Settings 页面
-	// Fetch settings data with success message
-	blogsWithCounts, err := s.db.ListBlogsWithCounts()
-	if err != nil {
-		log.Printf("handleBlogPreviewSave: error fetching blogs with counts - %v", err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
-	}
-
-	data := map[string]interface{}{
-		"SettingsBlogs":    blogsWithCounts,
-		"IsSettingsPage":   true,
-		"PreviewSuccess":   true,
-		"PreviewBlogName":  result.Blog.Name,
-		"PreviewFeedURL":   result.Blog.FeedURL,
-	}
-
+	// D-04: 跳转到 Settings 页面，使用 HX-Redirect 避免嵌套渲染
 	// Trigger sidebar and category list refresh via HTMX events
 	w.Header().Set("HX-Trigger", "blogListUpdated, categoryListUpdated")
-
-	s.renderTemplate(w, "settings-page.gohtml", data)
+	// Use HX-Redirect to navigate to settings page with success message
+	redirectURL := fmt.Sprintf("/settings?preview_success=true&blog_name=%s&feed_url=%s",
+		url.QueryEscape(result.Blog.Name),
+		url.QueryEscape(result.Blog.FeedURL))
+	w.Header().Set("HX-Redirect", redirectURL)
+	w.WriteHeader(http.StatusOK)
 	log.Printf("handleBlogPreviewSave: completed successfully, redirecting to Settings")
 }
 

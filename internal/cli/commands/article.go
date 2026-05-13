@@ -37,7 +37,7 @@ func NewArticleCmd() *cobra.Command {
 }
 
 // NewListCmd 创建 list 子命令
-// 支持筛选参数：--blog、--unread/--read、--not-noted、--after、--format
+// 支持筛选参数：--blog、--unread/--read、--not-noted、--after、--limit、--format
 func NewListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -51,6 +51,7 @@ func NewListCmd() *cobra.Command {
   --read           仅显示已读文章
   --not-noted      仅显示无备注文章
   --after <date>   显示指定日期之后的文章（格式 YYYY-MM-DD）
+  --limit <n>      最多返回 n 条结果（0 表示无限制）
 
 输出格式：
   --format table   表格格式（默认）
@@ -64,6 +65,7 @@ func NewListCmd() *cobra.Command {
   blogwatcher article list --not-noted --unread
   blogwatcher article list --category tech --unread
   blogwatcher article list --blog "Tech Blog" --unread --after 2026-01-01
+  blogwatcher article list --unread --limit 10
   blogwatcher article list --format json`,
 		Run: runList,
 	}
@@ -75,6 +77,7 @@ func NewListCmd() *cobra.Command {
 	cmd.Flags().Bool("read", false, "仅已读文章")
 	cmd.Flags().Bool("not-noted", false, "仅无备注文章")
 	cmd.Flags().String("after", "", "日期筛选（格式 YYYY-MM-DD）")
+	cmd.Flags().Int("limit", 0, "返回结果数量限制（0 表示无限制）")
 	cmd.Flags().String("format", "table", "输出格式（table|json|simple）")
 
 	// 标记 --unread 和 --read 为互斥
@@ -149,12 +152,14 @@ func runList(cmd *cobra.Command, args []string) {
 	read, _ := cmd.Flags().GetBool("read")
 	notNoted, _ := cmd.Flags().GetBool("not-noted")
 	afterStr, _ := cmd.Flags().GetString("after")
+	limit, _ := cmd.Flags().GetInt("limit")
 	format, _ := cmd.Flags().GetString("format")
 
 	// 构建筛选选项
 	opts := storage.ListFilterOptions{
 		BlogName:     blogName,
 		CategoryName: categoryName,
+		Limit:        limit,
 	}
 
 	// 设置 IsRead 状态筛选
