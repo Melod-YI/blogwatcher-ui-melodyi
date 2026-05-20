@@ -544,7 +544,7 @@ func (db *Database) ListBlogsWithCountsByCategoryID(categoryID int64) ([]BlogWit
 }
 
 func (db *Database) ListArticles(unreadOnly bool, blogID *int64) ([]model.Article, error) {
-	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note FROM articles WHERE 1=1`
+	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status FROM articles WHERE 1=1`
 	var args []interface{}
 	if unreadOnly {
 		query += " AND is_read = 0"
@@ -578,7 +578,7 @@ func (db *Database) ListArticles(unreadOnly bool, blogID *int64) ([]model.Articl
 // isRead=true returns read articles, isRead=false returns unread articles.
 // blogID filters to a specific blog if provided.
 func (db *Database) ListArticlesByReadStatus(isRead bool, blogID *int64) ([]model.Article, error) {
-	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note FROM articles WHERE is_read = ?`
+	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status FROM articles WHERE is_read = ?`
 	args := []interface{}{isRead}
 
 	if blogID != nil {
@@ -610,7 +610,7 @@ func (db *Database) ListArticlesByReadStatus(isRead bool, blogID *int64) ([]mode
 // Uses INNER JOIN to fetch blog info alongside article data.
 // isRead filters by read status, blogID optionally filters to a specific blog.
 func (db *Database) ListArticlesWithBlog(isRead bool, blogID *int64) ([]model.ArticleWithBlog, error) {
-	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url
+	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url, a.hn_url, a.hn_status
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id
 		WHERE a.is_read = ?`
@@ -647,7 +647,7 @@ func (db *Database) ListArticlesWithBlog(isRead bool, blogID *int64) ([]model.Ar
 func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWithBlog, int, error) {
 	// Build base query - conditionally add FTS5 JOIN only when searching
 	var query strings.Builder
-	query.WriteString(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url, COUNT(*) OVER() as total_count
+	query.WriteString(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url, COUNT(*) OVER() as total_count, a.hn_url, a.hn_status
 		FROM articles a`)
 
 	var conditions []string
@@ -656,8 +656,11 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 	// Add FTS5 JOIN only if search query provided
 	if opts.SearchQuery != "" {
 		query.WriteString(` JOIN articles_fts ON a.id = articles_fts.rowid`)
+		// Escape FTS5 special characters by wrapping in double quotes for phrase search
+		// This prevents FTS5 from interpreting colons as column qualifiers
+		escapedQuery := fmt.Sprintf("\"%s\"", strings.ReplaceAll(opts.SearchQuery, "\"", "\"\""))
 		conditions = append(conditions, "articles_fts MATCH ?")
-		args = append(args, opts.SearchQuery)
+		args = append(args, escapedQuery)
 	}
 
 	query.WriteString(` INNER JOIN blogs b ON a.blog_id = b.id`)
@@ -812,7 +815,7 @@ func (db *Database) GetBlogByID(id int64) (*model.Blog, error) {
 
 // GetArticleByID returns an article by its ID, or nil if not found.
 func (db *Database) GetArticleByID(id int64) (*model.Article, error) {
-	row := db.conn.QueryRow(`SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note FROM articles WHERE id = ?`, id)
+	row := db.conn.QueryRow(`SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status FROM articles WHERE id = ?`, id)
 	return scanArticle(row)
 }
 
@@ -1080,8 +1083,10 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 		discovered    sql.NullString
 		isRead        bool
 		hasNote       bool
+		hnURL         sql.NullString
+		hnStatus      sql.NullString
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -1096,6 +1101,8 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 		ThumbnailURL: thumbnailURL.String,
 		IsRead:       isRead,
 		HasNote:      hasNote,
+		HNURL:        hnURL.String,
+		HNStatus:     model.HNStatus(hnStatus.String),
 	}
 	if publishedDate.Valid {
 		if parsed, err := parseTime(publishedDate.String); err == nil {
@@ -1150,8 +1157,10 @@ func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.A
 		hasNote       bool
 		blogName      string
 		blogURL       string
+		hnURL         sql.NullString
+		hnStatus      sql.NullString
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &blogName, &blogURL); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &blogName, &blogURL, &hnURL, &hnStatus); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -1168,6 +1177,8 @@ func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.A
 		BlogName:     blogName,
 		BlogURL:      blogURL,
 		HasNote:      hasNote,
+		HNURL:        hnURL.String,
+		HNStatus:     model.HNStatus(hnStatus.String),
 	}
 	if publishedDate.Valid {
 		if parsed, err := parseTime(publishedDate.String); err == nil {
@@ -1197,8 +1208,10 @@ func scanArticleWithBlogAndCount(scanner interface{ Scan(dest ...any) error }) (
 		blogName      string
 		blogURL       string
 		totalCount    int
+		hnURL         sql.NullString
+		hnStatus      sql.NullString
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &blogName, &blogURL, &totalCount); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &blogName, &blogURL, &totalCount, &hnURL, &hnStatus); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, nil
 		}
@@ -1215,6 +1228,8 @@ func scanArticleWithBlogAndCount(scanner interface{ Scan(dest ...any) error }) (
 		HasNote:      hasNote,
 		BlogName:     blogName,
 		BlogURL:      blogURL,
+		HNURL:        hnURL.String,
+		HNStatus:     model.HNStatus(hnStatus.String),
 	}
 	if publishedDate.Valid {
 		if parsed, err := parseTime(publishedDate.String); err == nil {
@@ -1312,17 +1327,83 @@ type ListFilterOptions struct {
 	HasNote      *bool      // 备注状态筛选（nil 表示所有状态，false 表示无备注）
 	AfterDate    *time.Time // 日期筛选（nil 表示无限制）
 	Limit        int        // 结果数量限制（0 表示无限制）
+	Offset       int        // 结果偏移量（用于翻页）
 }
 
 // ListArticlesWithFilters 根据筛选选项列出文章（带博客信息）
 // 支持按博客名称、分类名称、已读状态、日期筛选，用于 CLI article list 命令
 func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.ArticleWithBlog, error) {
+	// 构建筛选条件
+	conditions, args := buildFilterConditions(opts)
+
 	// 构建基础查询
-	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url
+	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, b.name, b.url, a.hn_url, a.hn_status
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id
 		WHERE 1=1`
 
+	// 添加 WHERE 条件
+	if len(conditions) > 0 {
+		query += " AND " + strings.Join(conditions, " AND ")
+	}
+
+	// 排序：按发布日期或发现日期降序
+	query += " ORDER BY COALESCE(a.published_date, a.discovered_date) DESC"
+
+	// 结果数量限制
+	if opts.Limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", opts.Limit)
+	}
+
+	// 结果偏移量（翻页）
+	if opts.Offset > 0 {
+		query += fmt.Sprintf(" OFFSET %d", opts.Offset)
+	}
+
+	// 执行查询
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// 扫描结果
+	var articles []model.ArticleWithBlog
+	for rows.Next() {
+		article, err := scanArticleWithBlog(rows)
+		if err != nil {
+			return nil, err
+		}
+		if article != nil {
+			articles = append(articles, *article)
+		}
+	}
+
+	return articles, rows.Err()
+}
+
+// CountArticlesWithFilters 根据筛选选项统计文章总数
+// 筛选条件与 ListArticlesWithFilters 相同，但不计 limit 和 offset
+func (db *Database) CountArticlesWithFilters(opts ListFilterOptions) (int64, error) {
+	// 构建筛选条件
+	conditions, args := buildFilterConditions(opts)
+
+	// 构建计数查询
+	query := `SELECT COUNT(*) FROM articles a INNER JOIN blogs b ON a.blog_id = b.id WHERE 1=1`
+
+	// 添加 WHERE 条件
+	if len(conditions) > 0 {
+		query += " AND " + strings.Join(conditions, " AND ")
+	}
+
+	// 执行查询
+	var count int64
+	err := db.conn.QueryRow(query, args...).Scan(&count)
+	return count, err
+}
+
+// buildFilterConditions 构建筛选条件，供 ListArticlesWithFilters 和 CountArticlesWithFilters 复用
+func buildFilterConditions(opts ListFilterOptions) ([]string, []interface{}) {
 	var conditions []string
 	var args []interface{}
 
@@ -1356,39 +1437,7 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 		args = append(args, opts.AfterDate.Format("2006-01-02"))
 	}
 
-	// 添加 WHERE 条件
-	if len(conditions) > 0 {
-		query += " AND " + strings.Join(conditions, " AND ")
-	}
-
-	// 排序：按发布日期或发现日期降序
-	query += " ORDER BY COALESCE(a.published_date, a.discovered_date) DESC"
-
-	// 结果数量限制
-	if opts.Limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", opts.Limit)
-	}
-
-	// 执行查询
-	rows, err := db.conn.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	// 扫描结果
-	var articles []model.ArticleWithBlog
-	for rows.Next() {
-		article, err := scanArticleWithBlog(rows)
-		if err != nil {
-			return nil, err
-		}
-		if article != nil {
-			articles = append(articles, *article)
-		}
-	}
-
-	return articles, rows.Err()
+	return conditions, args
 }
 
 // CreateCategory creates a new category and returns it with the assigned ID.

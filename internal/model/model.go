@@ -4,6 +4,16 @@ package model
 
 import "time"
 
+// HNStatus represents the status of Hacker News discussion detection.
+type HNStatus string
+
+const (
+	HNStatusNone     HNStatus = ""        // 未检测或无讨论
+	HNStatusFound    HNStatus = "found"   // 已找到讨论链接
+	HNStatusNotFound HNStatus = "notfound" // 已检测但未找到讨论
+	HNStatusError    HNStatus = "error"   // 检测出错
+)
+
 // Category represents a blog category for organizing blogs.
 type Category struct {
 	ID        int64
@@ -30,7 +40,9 @@ type Article struct {
 	PublishedDate  *time.Time
 	DiscoveredDate *time.Time
 	IsRead         bool
-	HasNote        bool // 文章备注状态
+	HasNote        bool    // 文章备注状态
+	HNURL          string  // Hacker News 讨论链接（空表示无讨论）
+	HNStatus       HNStatus // HN 讨论检测状态
 }
 
 // ArticleWithBlog extends Article with blog metadata for display in article cards.
@@ -46,7 +58,9 @@ type ArticleWithBlog struct {
 	IsRead         bool
 	BlogName       string
 	BlogURL        string
-	HasNote        bool // 文章备注状态
+	HasNote        bool    // 文章备注状态
+	HNURL          string  // Hacker News 讨论链接（空表示无讨论）
+	HNStatus       HNStatus // HN 讨论检测状态
 }
 
 // SearchOptions contains all filter parameters for article search.
