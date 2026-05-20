@@ -13,7 +13,8 @@ import (
 // FormatTable 将文章列表格式化为表格输出
 // 表头：ID、Title、Blog、Status、Published
 // 标题截断到 50 字符，状态使用中文显示
-func FormatTable(articles []model.ArticleWithBlog) string {
+// 最后显示分页信息
+func FormatTable(articles []model.ArticleWithBlog, meta PaginationMeta) string {
 	if len(articles) == 0 {
 		return "没有找到文章"
 	}
@@ -71,6 +72,10 @@ func FormatTable(articles []model.ArticleWithBlog) string {
 
 		rows = append(rows, row)
 	}
+
+	// 添加分页信息
+	rows = append(rows, "")
+	rows = append(rows, formatPaginationFooter(meta))
 
 	return strings.Join(rows, "\n")
 }

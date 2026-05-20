@@ -1338,6 +1338,7 @@ type ListFilterOptions struct {
 	HasNote      *bool      // 备注状态筛选（nil 表示所有状态，false 表示无备注）
 	AfterDate    *time.Time // 日期筛选（nil 表示无限制）
 	Limit        int        // 结果数量限制（0 表示无限制）
+	Offset       int        // 结果偏移量（用于翻页）
 }
 
 // ListArticlesWithFilters 根据筛选选项列出文章（带博客信息）
@@ -1393,6 +1394,11 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 	// 结果数量限制
 	if opts.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", opts.Limit)
+	}
+
+	// 结果偏移量（翻页）
+	if opts.Offset > 0 {
+		query += fmt.Sprintf(" OFFSET %d", opts.Offset)
 	}
 
 	// 执行查询
@@ -1699,4 +1705,62 @@ func (db *Database) GetArticlesForHNSync(mode string, blogName string, limit int
 		articles = append(articles, a)
 	}
 	return articles, rows.Err()
+}
+
+// buildFilterConditions 构建筛选条件，供 ListArticlesWithFilters 和 CountArticlesWithFilters 使用
+func buildFilterConditions(opts ListFilterOptions) ([]string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	// 博客名称筛选（通过子查询获取 blog_id）
+	if opts.BlogName != "" {
+		conditions = append(conditions, "a.blog_id = (SELECT id FROM blogs WHERE name = ?)")
+		args = append(args, opts.BlogName)
+	}
+
+	// 分类名称筛选（通过子查询获取 category_id）
+	if opts.CategoryName != "" {
+		conditions = append(conditions, "b.category_id = (SELECT id FROM categories WHERE name = ?)")
+		args = append(args, opts.CategoryName)
+	}
+
+	// 已读状态筛选
+	if opts.IsRead != nil {
+		conditions = append(conditions, "a.is_read = ?")
+		args = append(args, *opts.IsRead)
+	}
+
+	// 备注状态筛选
+	if opts.HasNote != nil {
+		conditions = append(conditions, "a.has_note = ?")
+		args = append(args, *opts.HasNote)
+	}
+
+	// 日期筛选（使用 published_date 或 discovered_date）
+	if opts.AfterDate != nil {
+		conditions = append(conditions, "COALESCE(a.published_date, a.discovered_date) >= ?")
+		args = append(args, opts.AfterDate.Format("2006-01-02"))
+	}
+
+	return conditions, args
+}
+
+// CountArticlesWithFilters 根据筛选选项统计文章总数
+// 筛选条件与 ListArticlesWithFilters 相同，但不计 limit 和 offset
+func (db *Database) CountArticlesWithFilters(opts ListFilterOptions) (int64, error) {
+	// 构建筛选条件
+	conditions, args := buildFilterConditions(opts)
+
+	// 构建计数查询
+	query := `SELECT COUNT(*) FROM articles a INNER JOIN blogs b ON a.blog_id = b.id WHERE 1=1`
+
+	// 添加 WHERE 条件
+	if len(conditions) > 0 {
+		query += " AND " + strings.Join(conditions, " AND ")
+	}
+
+	// 执行查询
+	var count int64
+	err := db.conn.QueryRow(query, args...).Scan(&count)
+	return count, err
 }

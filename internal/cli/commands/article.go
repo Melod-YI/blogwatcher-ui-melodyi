@@ -14,6 +14,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// 常量定义
+const (
+	DefaultLimit   = 20  // 默认返回数量
+	MaxLimit       = 100 // 最大返回数量
+	MaxInputLength = 50  // 博客/分类名称最大长度
+)
+
 // NewArticleCmd 创建 article 命令（命令组）
 // article 是一个命令组，包含 list、mark-read、mark-unread 子命令
 func NewArticleCmd() *cobra.Command {
@@ -37,7 +44,7 @@ func NewArticleCmd() *cobra.Command {
 }
 
 // NewListCmd 创建 list 子命令
-// 支持筛选参数：--blog、--unread/--read、--not-noted、--after、--limit、--format
+// 支持筛选参数：--blog、--unread/--read、--noted/--not-noted、--after、--limit、--offset、--format
 func NewListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -49,9 +56,11 @@ func NewListCmd() *cobra.Command {
   --category <name> 按分类名称筛选
   --unread         仅显示未读文章
   --read           仅显示已读文章
+  --noted          仅显示有备注文章
   --not-noted      仅显示无备注文章
   --after <date>   显示指定日期之后的文章（格式 YYYY-MM-DD）
-  --limit <n>      最多返回 n 条结果（0 表示无限制）
+  --limit <n>      最多返回 n 条结果（默认 20，最大 100，0 表示无限制）
+  --offset <n>     跳过前 n 条结果（用于翻页）
 
 输出格式：
   --format table   表格格式（默认）
@@ -61,11 +70,13 @@ func NewListCmd() *cobra.Command {
 示例：
   blogwatcher article list
   blogwatcher article list --unread
+  blogwatcher article list --noted
   blogwatcher article list --not-noted
-  blogwatcher article list --not-noted --unread
+  blogwatcher article list --noted --unread
   blogwatcher article list --category tech --unread
   blogwatcher article list --blog "Tech Blog" --unread --after 2026-01-01
   blogwatcher article list --unread --limit 10
+  blogwatcher article list --limit 20 --offset 20  # 第二页
   blogwatcher article list --format json`,
 		Run: runList,
 	}
@@ -75,13 +86,16 @@ func NewListCmd() *cobra.Command {
 	cmd.Flags().String("category", "", "分类名称筛选")
 	cmd.Flags().Bool("unread", false, "仅未读文章")
 	cmd.Flags().Bool("read", false, "仅已读文章")
+	cmd.Flags().Bool("noted", false, "仅有备注文章")
 	cmd.Flags().Bool("not-noted", false, "仅无备注文章")
 	cmd.Flags().String("after", "", "日期筛选（格式 YYYY-MM-DD）")
-	cmd.Flags().Int("limit", 0, "返回结果数量限制（0 表示无限制）")
+	cmd.Flags().Int("limit", DefaultLimit, fmt.Sprintf("返回结果数量限制（默认 %d，最大 %d，0 表示无限制）", DefaultLimit, MaxLimit))
+	cmd.Flags().Int("offset", 0, "结果偏移量（用于翻页）")
 	cmd.Flags().String("format", "table", "输出格式（table|json|simple）")
 
-	// 标记 --unread 和 --read 为互斥
+	// 标记互斥 flags
 	cmd.MarkFlagsMutuallyExclusive("unread", "read")
+	cmd.MarkFlagsMutuallyExclusive("noted", "not-noted")
 
 	return cmd
 }
@@ -150,16 +164,45 @@ func runList(cmd *cobra.Command, args []string) {
 	categoryName, _ := cmd.Flags().GetString("category")
 	unread, _ := cmd.Flags().GetBool("unread")
 	read, _ := cmd.Flags().GetBool("read")
+	noted, _ := cmd.Flags().GetBool("noted")
 	notNoted, _ := cmd.Flags().GetBool("not-noted")
 	afterStr, _ := cmd.Flags().GetString("after")
 	limit, _ := cmd.Flags().GetInt("limit")
+	offset, _ := cmd.Flags().GetInt("offset")
 	format, _ := cmd.Flags().GetString("format")
+
+	// 验证输入长度
+	if len(blogName) > MaxInputLength {
+		fmt.Fprintf(os.Stderr, "博客名称长度超过最大值 %d\n", MaxInputLength)
+		os.Exit(1)
+	}
+	if len(categoryName) > MaxInputLength {
+		fmt.Fprintf(os.Stderr, "分类名称长度超过最大值 %d\n", MaxInputLength)
+		os.Exit(1)
+	}
+
+	// 验证并处理 limit 参数
+	if limit < 0 {
+		fmt.Fprintf(os.Stderr, "limit 参数不能为负数\n")
+		os.Exit(1)
+	}
+	if limit > MaxLimit {
+		fmt.Fprintf(os.Stderr, "limit 参数超过最大值 %d\n", MaxLimit)
+		os.Exit(1)
+	}
+
+	// 验证 offset 参数
+	if offset < 0 {
+		fmt.Fprintf(os.Stderr, "offset 参数不能为负数\n")
+		os.Exit(1)
+	}
 
 	// 构建筛选选项
 	opts := storage.ListFilterOptions{
 		BlogName:     blogName,
 		CategoryName: categoryName,
 		Limit:        limit,
+		Offset:       offset,
 	}
 
 	// 设置 IsRead 状态筛选
@@ -173,10 +216,14 @@ func runList(cmd *cobra.Command, args []string) {
 	// 如果都没有设置，opts.IsRead 为 nil（所有状态）
 
 	// 设置 HasNote 状态筛选
-	if notNoted {
+	if noted {
+		hasNote := true
+		opts.HasNote = &hasNote
+	} else if notNoted {
 		hasNote := false
 		opts.HasNote = &hasNote
 	}
+	// 如果都没有设置，opts.HasNote 为 nil（所有状态）
 
 	// 解析日期筛选
 	if afterStr != "" {
@@ -192,6 +239,13 @@ func runList(cmd *cobra.Command, args []string) {
 	articles, err := db.ListArticlesWithFilters(opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "查询文章失败: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 查询总数
+	total, err := db.CountArticlesWithFilters(opts)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "查询总数失败: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -223,15 +277,24 @@ func runList(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// 构建分页元信息
+	meta := output.PaginationMeta{
+		Total:   total,
+		Count:   len(articles),
+		Offset:  offset,
+		Limit:   limit,
+		HasMore: int64(offset+len(articles)) < total,
+	}
+
 	// 根据格式输出结果
 	var result string
 	switch format {
 	case "json":
-		result = output.FormatJSON(articles)
+		result = output.FormatJSON(articles, meta)
 	case "simple":
-		result = output.FormatSimple(articles)
+		result = output.FormatSimple(articles, meta)
 	default:
-		result = output.FormatTable(articles)
+		result = output.FormatTable(articles, meta)
 	}
 
 	fmt.Println(result)

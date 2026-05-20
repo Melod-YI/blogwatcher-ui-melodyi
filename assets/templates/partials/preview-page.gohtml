@@ -13,8 +13,8 @@
     <div class="preview-actions">
         <button type="button"
                 class="btn-action btn-secondary"
-                hx-get="/settings"
-                hx-target="#main-content"
+                hx-get="/blogs/add/form?name={{.BlogName}}&url={{.BlogURL}}&feed_url={{.FeedURL}}"
+                hx-target="#add-blog-form-container"
                 hx-swap="innerHTML">
             Back to Edit
         </button>
@@ -42,8 +42,8 @@
     <div class="preview-actions">
         <button type="button"
                 class="btn-action btn-secondary"
-                hx-get="/settings"
-                hx-target="#main-content"
+                hx-get="/blogs/add/form?name={{.BlogName}}&url={{.BlogURL}}&feed_url={{.FeedURL}}"
+                hx-target="#add-blog-form-container"
                 hx-swap="innerHTML">
             Back to Edit
         </button>

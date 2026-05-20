@@ -23,17 +23,19 @@ type ArticleJSONOutput struct {
 	HNStatus  string `json:"hn_status,omitempty"`
 }
 
-// FormatJSON 将文章列表格式化为 JSON 输出
-// 使用简化结构，输出格式化的 JSON 字符串
-func FormatJSON(articles []model.ArticleWithBlog) string {
-	if len(articles) == 0 {
-		return "[]"
-	}
+// JSONOutput JSON 输出的完整结构
+type JSONOutput struct {
+	Articles    []ArticleJSONOutput `json:"articles"`
+	Pagination  PaginationMeta      `json:"pagination"`
+}
 
+// FormatJSON 将文章列表格式化为 JSON 输出
+// 使用简化结构，包含分页信息，输出格式化的 JSON 字符串
+func FormatJSON(articles []model.ArticleWithBlog, meta PaginationMeta) string {
 	// 转换为 JSON 输出结构
-	output := make([]ArticleJSONOutput, len(articles))
+	data := make([]ArticleJSONOutput, len(articles))
 	for i, article := range articles {
-		output[i] = ArticleJSONOutput{
+		data[i] = ArticleJSONOutput{
 			ID:       article.ID,
 			Title:    article.Title,
 			URL:      article.URL,
@@ -53,15 +55,21 @@ func FormatJSON(articles []model.ArticleWithBlog) string {
 		}
 
 		if !t.IsZero() {
-			output[i].Published = t.Format("2006-01-02")
+			data[i].Published = t.Format("2006-01-02")
 		}
 	}
 
+	// 构建完整输出
+	output := JSONOutput{
+		Articles:   data,
+		Pagination: meta,
+	}
+
 	// 序列化为 JSON
-	data, err := json.MarshalIndent(output, "", "  ")
+	result, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("JSON 序列化错误: %v", err)
 	}
 
-	return string(data)
+	return string(result)
 }
