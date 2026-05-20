@@ -2182,3 +2182,12 @@ html.dark {
   flex: 1;
   justify-content: center;
 }
+
+/* HN 模糊匹配按钮样式 - 更低调 */
+.action-btn-muted {
+  opacity: 0.7;
+  border-color: #9ca3af;
+}
+.action-btn-muted:hover {
+  opacity: 1;
+}

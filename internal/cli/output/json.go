@@ -17,7 +17,10 @@ type ArticleJSONOutput struct {
 	URL       string `json:"url"`
 	Blog      string `json:"blog"`
 	Read      bool   `json:"read"`
+	HasNote   bool   `json:"has_note"`
 	Published string `json:"published,omitempty"`
+	HNURL     string `json:"hn_url,omitempty"`
+	HNStatus  string `json:"hn_status,omitempty"`
 }
 
 // FormatJSON 将文章列表格式化为 JSON 输出
@@ -31,11 +34,14 @@ func FormatJSON(articles []model.ArticleWithBlog) string {
 	output := make([]ArticleJSONOutput, len(articles))
 	for i, article := range articles {
 		output[i] = ArticleJSONOutput{
-			ID:    article.ID,
-			Title: article.Title,
-			URL:   article.URL,
-			Blog:  article.BlogName,
-			Read:  article.IsRead,
+			ID:       article.ID,
+			Title:    article.Title,
+			URL:      article.URL,
+			Blog:     article.BlogName,
+			Read:     article.IsRead,
+			HasNote:  article.HasNote,
+			HNURL:    article.HNURL,
+			HNStatus: string(article.HNStatus),
 		}
 
 		// 格式化时间

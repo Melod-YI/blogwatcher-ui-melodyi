@@ -66,6 +66,16 @@
             <span class="action-btn-label">Note</span>
         </a>
         {{end}}
+        {{if .HNURL}}
+        <a href="{{.HNURL}}"
+           target="_blank"
+           rel="noopener noreferrer"
+           class="action-btn{{if eq .HNStatus "found_fuzzy"}} action-btn-muted{{end}}"
+           title="查看 HN 讨论{{if eq .HNStatus "found_fuzzy"}}（模糊匹配）{{end}}"
+           onclick="event.stopPropagation();">
+            <span class="action-btn-label">HN</span>
+        </a>
+        {{end}}
         {{if .IsRead}}
         <button class="action-btn"
                 hx-post="/articles/{{.ID}}/unread"
