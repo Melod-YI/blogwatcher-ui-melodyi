@@ -31,6 +31,8 @@ type Article struct {
 	DiscoveredDate *time.Time
 	IsRead         bool
 	HasNote        bool // 文章备注状态
+	HNURL          string   // Hacker News 讨论链接
+	HNStatus       HNStatus // HN 链接搜索状态
 }
 
 // ArticleWithBlog extends Article with blog metadata for display in article cards.
@@ -47,6 +49,8 @@ type ArticleWithBlog struct {
 	BlogName       string
 	BlogURL        string
 	HasNote        bool // 文章备注状态
+	HNURL          string   // Hacker News 讨论链接
+	HNStatus       HNStatus // HN 链接搜索状态
 }
 
 // SearchOptions contains all filter parameters for article search.
@@ -63,3 +67,14 @@ type SearchOptions struct {
 
 // DefaultPageSize is the default number of articles per page.
 const DefaultPageSize = 20
+
+// HNStatus 定义 HN 链接搜索状态枚举
+type HNStatus string
+
+const (
+	HNStatusNotSearch HNStatus = "not_searched" // 未搜索
+	HNStatusExact     HNStatus = "found_exact"  // 精确匹配
+	HNStatusFuzzy     HNStatus = "found_fuzzy"  // 模糊匹配
+	HNStatusNotFound  HNStatus = "not_found"    // 搜索无结果
+	HNStatusFailed    HNStatus = "failed"       // 搜索失败
+)
