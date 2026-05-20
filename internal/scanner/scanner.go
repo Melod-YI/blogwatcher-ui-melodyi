@@ -5,9 +5,11 @@ package scanner
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/hn"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/rss"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/scraper"
@@ -22,6 +24,9 @@ type ScanResult struct {
 	TotalFound   int
 	Source       string
 	Error        string
+	HNSearched   int // 尝试搜索 HN 的文章数
+	HNFound      int // 找到 HN 链接的文章数（精确+模糊）
+	HNFailed     int // HN 搜索失败数
 }
 
 // ScanBlog scans a single blog for articles. It performs an incremental sync:
@@ -156,6 +161,32 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 		}
 	}
 
+	// Phase 6: Search HN discussion for new articles
+	hnSearched := 0
+	hnFound := 0
+	hnFailed := 0
+
+	if len(newArticles) > 0 {
+		log.Printf("[Scanner] 博客 '%s': 开始搜索 %d 篇新文章的 HN 讨论", blog.Name, len(newArticles))
+		for _, article := range newArticles {
+			hnSearched++
+			match, err := hn.SearchHNDiscussion(ctx, article.URL)
+			if err != nil {
+				log.Printf("[Scanner] HN 搜索失败，文章 ID %d: %v", article.ID, err)
+				hnFailed++
+				_ = db.UpdateArticleHNStatus(article.ID, "", model.HNStatusFailed)
+				continue
+			}
+
+			if match.Status == model.HNStatusExact || match.Status == model.HNStatusFuzzy {
+				hnFound++
+			}
+
+			_ = db.UpdateArticleHNStatus(article.ID, match.HNURL, match.Status)
+		}
+		log.Printf("[Scanner] 博客 '%s': HN 搜索完成，找到 %d/%d，失败 %d", blog.Name, hnFound, hnSearched, hnFailed)
+	}
+
 	_ = db.UpdateBlogLastScanned(blog.ID, time.Now())
 
 	return ScanResult{
@@ -165,6 +196,9 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 		TotalFound:   len(seenURLs),
 		Source:       source,
 		Error:        errText,
+		HNSearched:   hnSearched,
+		HNFound:      hnFound,
+		HNFailed:     hnFailed,
 	}
 }
 
