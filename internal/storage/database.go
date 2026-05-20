@@ -1626,3 +1626,77 @@ func (db *Database) UpdateBlogCategory(blogID int64, categoryID *int64) error {
 
 	return nil
 }
+
+// UpdateArticleHNStatus 更新文章的 HN 链接和搜索状态
+func (db *Database) UpdateArticleHNStatus(id int64, hnURL string, status model.HNStatus) error {
+	_, err := db.conn.Exec(
+		`UPDATE articles SET hn_url = ?, hn_status = ? WHERE id = ?`,
+		nullIfEmpty(hnURL),
+		string(status),
+		id,
+	)
+	return err
+}
+
+// ArticleForHNSync 用于 HN 同步的文章数据
+type ArticleForHNSync struct {
+	ID  int64
+	URL string
+}
+
+// GetArticlesForHNSync 返回需要 HN 搜索的文章列表
+// mode: "not_searched" - 仅未搜索的文章
+// mode: "failed" - 仅失败的文章
+// mode: "all" - 所有文章（重新搜索）
+// blogName: 可选，筛选指定博客的文章
+func (db *Database) GetArticlesForHNSync(mode string, blogName string, limit int) ([]ArticleForHNSync, error) {
+	var query string
+	var args []interface{}
+
+	// 基础查询
+	query = `SELECT a.id, a.url FROM articles a`
+
+	// 博客筛选
+	if blogName != "" {
+		query += ` INNER JOIN blogs b ON a.blog_id = b.id WHERE b.name = ?`
+		args = append(args, blogName)
+		query += ` AND`
+	} else {
+		query += ` WHERE`
+	}
+
+	// 状态筛选
+	switch mode {
+	case "not_searched":
+		query += ` a.hn_status = 'not_searched'`
+	case "failed":
+		query += ` a.hn_status = 'failed'`
+	case "all":
+		query += ` 1=1` // 所有文章
+	default:
+		query += ` a.hn_status = 'not_searched'` // 默认未搜索
+	}
+
+	query += ` ORDER BY a.id DESC`
+
+	// 数量限制
+	if limit > 0 {
+		query += fmt.Sprintf(` LIMIT %d`, limit)
+	}
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var articles []ArticleForHNSync
+	for rows.Next() {
+		var a ArticleForHNSync
+		if err := rows.Scan(&a.ID, &a.URL); err != nil {
+			return nil, err
+		}
+		articles = append(articles, a)
+	}
+	return articles, rows.Err()
+}
