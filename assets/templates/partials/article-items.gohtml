@@ -1,9 +1,11 @@
 {{define "article-items.gohtml"}}
 {{/* ABOUTME: Renders article cards for infinite scroll loading.
      ABOUTME: Returns just the article cards and load-more trigger without header/toolbar. */}}
+{{if .DisplayedCount}}
 <div id="results-info" hx-swap-oob="true" class="results-info">
     Showing {{.DisplayedCount}} of {{.ArticleCount}} article{{if ne .ArticleCount 1}}s{{end}}
 </div>
+{{end}}
 {{range .Articles}}
 <article class="article-card" id="article-{{.ID}}">
     {{if .ThumbnailURL}}
@@ -46,6 +48,25 @@
         </div>
     </div>
     <div class="article-actions">
+        {{if .IsFavorited}}
+        <button class="action-btn action-btn-favorite active"
+                hx-post="/articles/{{.ID}}/unfavorite"
+                hx-target="#article-{{.ID}}"
+                hx-swap="outerHTML swap:300ms"
+                title="取消收藏"
+                onclick="event.stopPropagation();">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" style="width:16px;height:16px;flex-shrink:0;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+        {{else}}
+        <button class="action-btn action-btn-favorite"
+                hx-post="/articles/{{.ID}}/favorite"
+                hx-target="#article-{{.ID}}"
+                hx-swap="outerHTML swap:300ms"
+                title="收藏"
+                onclick="event.stopPropagation();">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+        {{end}}
         {{if .HasNote}}
         <a href="/note/{{.ID}}"
            target="_blank"

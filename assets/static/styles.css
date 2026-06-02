@@ -2139,3 +2139,25 @@ html.dark {
 .action-btn-muted:hover {
   opacity: 1;
 }
+
+/* Favorite button styles */
+.action-btn-favorite {
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+
+.action-btn-favorite:hover {
+  color: #f59e0b;
+  background-color: transparent;
+  border-color: #f59e0b;
+}
+
+.action-btn-favorite.active {
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.action-btn-favorite.active:hover {
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
