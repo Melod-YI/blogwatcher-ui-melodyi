@@ -202,6 +202,13 @@ func (db *Database) ensureMigrations() error {
 		}
 	}
 
+	// Add is_favorited column if it doesn't exist
+	if !db.columnExists("articles", "is_favorited") {
+		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN is_favorited BOOLEAN DEFAULT FALSE`); err != nil {
+			return fmt.Errorf("failed to add is_favorited column: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -781,6 +788,40 @@ func (db *Database) UpdateArticleHasNote(id int64, hasNote bool) error {
 		return err
 	}
 	if rowsAffected == 0 {
+		return fmt.Errorf("article not found: %d", id)
+	}
+	return nil
+}
+
+// FavoriteArticle marks an article as favorited.
+// Returns error if the article does not exist.
+func (db *Database) FavoriteArticle(id int64) error {
+	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 1 WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to favorite article: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("article not found: %d", id)
+	}
+	return nil
+}
+
+// UnfavoriteArticle removes the favorite mark from an article.
+// Returns error if the article does not exist.
+func (db *Database) UnfavoriteArticle(id int64) error {
+	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 0 WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to unfavorite article: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
 		return fmt.Errorf("article not found: %d", id)
 	}
 	return nil
