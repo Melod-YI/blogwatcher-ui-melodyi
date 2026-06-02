@@ -582,3 +582,203 @@ func TestUpdateBlogCategoryNotFound(t *testing.T) {
 		t.Fatal("expected error for non-existent blog")
 	}
 }
+
+func TestSanitizeFTS5Query(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "simple word no special chars",
+			input: "anthropic",
+			want:  "anthropic",
+		},
+		{
+			name:  "hyphenated phrase",
+			input: "the-anthropic-economic-index",
+			want:  `"the-anthropic-economic-index"`,
+		},
+		{
+			name:  "phrase with space",
+			input: "anthropic economic",
+			want:  `"anthropic economic"`,
+		},
+		{
+			name:  "phrase with asterisk",
+			input: "anthropic*",
+			want:  `"anthropic*"`,
+		},
+		{
+			name:  "phrase with parentheses",
+			input: "(anthropic)",
+			want:  `"(anthropic)"`,
+		},
+		{
+			name:  "contains double quote",
+			input: `test"query`,
+			want:  `"test""query"`,
+		},
+		{
+			name:  "phrase with colon",
+			input: "title:anthropic",
+			want:  `"title:anthropic"`,
+		},
+		{
+			name:  "phrase with caret",
+			input: "anthropic^5",
+			want:  `"anthropic^5"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeFTS5Query(tt.input)
+			if got != tt.want {
+				t.Errorf("sanitizeFTS5Query(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFavoriteArticle(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	// Create a blog and article
+	blog, err := db.AddBlog(model.Blog{Name: "Test", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+
+	articles := []model.Article{
+		{BlogID: blog.ID, Title: "Test Article", URL: "https://example.com/1", HNStatus: model.HNStatusNotSearch},
+	}
+	inserted, _, err := db.AddArticlesBulk(articles)
+	if err != nil || inserted != 1 {
+		t.Fatalf("add articles: inserted=%d, skipped=%d, err=%v", inserted, 0, err)
+	}
+
+	// Get the article ID
+	allArticles, err := db.ListArticles(false, nil)
+	if err != nil || len(allArticles) != 1 {
+		t.Fatalf("list articles: %v, count=%d", err, len(allArticles))
+	}
+	articleID := allArticles[0].ID
+
+	// Verify default is not favorited
+	if allArticles[0].IsFavorited {
+		t.Fatal("expected article to not be favorited by default")
+	}
+
+	// Favorite the article
+	if err := db.FavoriteArticle(articleID); err != nil {
+		t.Fatalf("favorite article: %v", err)
+	}
+
+	// Verify it is now favorited
+	article, err := db.GetArticleByID(articleID)
+	if err != nil {
+		t.Fatalf("get article: %v", err)
+	}
+	if !article.IsFavorited {
+		t.Fatal("expected article to be favorited")
+	}
+
+	// Unfavorite the article
+	if err := db.UnfavoriteArticle(articleID); err != nil {
+		t.Fatalf("unfavorite article: %v", err)
+	}
+
+	// Verify it is no longer favorited
+	article, err = db.GetArticleByID(articleID)
+	if err != nil {
+		t.Fatalf("get article: %v", err)
+	}
+	if article.IsFavorited {
+		t.Fatal("expected article to not be favorited after unfavorite")
+	}
+}
+
+func TestFavoriteArticleNotFound(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	err := db.FavoriteArticle(99999)
+	if err == nil {
+		t.Fatal("expected error for non-existent article")
+	}
+
+	err = db.UnfavoriteArticle(99999)
+	if err == nil {
+		t.Fatal("expected error for non-existent article")
+	}
+}
+
+func TestSearchArticlesWithFavoriteFilter(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	// Create blog and articles
+	blog, err := db.AddBlog(model.Blog{Name: "Test", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+
+	articles := []model.Article{
+		{BlogID: blog.ID, Title: "Article 1", URL: "https://example.com/1", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "Article 2", URL: "https://example.com/2", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "Article 3", URL: "https://example.com/3", HNStatus: model.HNStatusNotSearch},
+	}
+	inserted, _, err := db.AddArticlesBulk(articles)
+	if err != nil || inserted != 3 {
+		t.Fatalf("add articles: inserted=%d, err=%v", inserted, err)
+	}
+
+	// Favorite article 1 and 2
+	allArticles, _ := db.ListArticles(false, nil)
+	if err := db.FavoriteArticle(allArticles[0].ID); err != nil {
+		t.Fatalf("favorite: %v", err)
+	}
+	if err := db.FavoriteArticle(allArticles[1].ID); err != nil {
+		t.Fatalf("favorite: %v", err)
+	}
+
+	// Search for favorited only
+	isFav := true
+	opts := model.SearchOptions{IsFavorited: &isFav, Limit: 100}
+	results, count, err := db.SearchArticles(opts)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("expected 2 favorited articles, got %d", count)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for _, r := range results {
+		if !r.IsFavorited {
+			t.Fatalf("expected all results to be favorited, got %+v", r)
+		}
+	}
+
+	// Search for non-favorited only
+	isFav = false
+	opts = model.SearchOptions{IsFavorited: &isFav, Limit: 100}
+	results, count, err = db.SearchArticles(opts)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 non-favorited article, got %d", count)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+}
