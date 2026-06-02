@@ -565,7 +565,7 @@ func (db *Database) ListBlogsWithCountsByCategoryID(categoryID int64) ([]BlogWit
 }
 
 func (db *Database) ListArticles(unreadOnly bool, blogID *int64) ([]model.Article, error) {
-	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status FROM articles WHERE 1=1`
+	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status, is_favorited FROM articles WHERE 1=1`
 	var args []interface{}
 	if unreadOnly {
 		query += " AND is_read = 0"
@@ -599,7 +599,7 @@ func (db *Database) ListArticles(unreadOnly bool, blogID *int64) ([]model.Articl
 // isRead=true returns read articles, isRead=false returns unread articles.
 // blogID filters to a specific blog if provided.
 func (db *Database) ListArticlesByReadStatus(isRead bool, blogID *int64) ([]model.Article, error) {
-	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status FROM articles WHERE is_read = ?`
+	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status, is_favorited FROM articles WHERE is_read = ?`
 	args := []interface{}{isRead}
 
 	if blogID != nil {
@@ -631,7 +631,7 @@ func (db *Database) ListArticlesByReadStatus(isRead bool, blogID *int64) ([]mode
 // Uses INNER JOIN to fetch blog info alongside article data.
 // isRead filters by read status, blogID optionally filters to a specific blog.
 func (db *Database) ListArticlesWithBlog(isRead bool, blogID *int64) ([]model.ArticleWithBlog, error) {
-	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url
+	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, a.is_favorited, b.name, b.url
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id
 		WHERE a.is_read = ?`
@@ -668,7 +668,7 @@ func (db *Database) ListArticlesWithBlog(isRead bool, blogID *int64) ([]model.Ar
 func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWithBlog, int, error) {
 	// Build base query - conditionally add FTS5 JOIN only when searching
 	var query strings.Builder
-	query.WriteString(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, COUNT(*) OVER() as total_count
+	query.WriteString(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, a.is_favorited, b.name, b.url, COUNT(*) OVER() as total_count
 		FROM articles a`)
 
 	var conditions []string
@@ -688,6 +688,12 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 	if opts.IsRead != nil {
 		conditions = append(conditions, "a.is_read = ?")
 		args = append(args, *opts.IsRead)
+	}
+
+	// Add favorite filter if IsFavorited is not nil
+	if opts.IsFavorited != nil {
+		conditions = append(conditions, "a.is_favorited = ?")
+		args = append(args, *opts.IsFavorited)
 	}
 
 	// Add blog filter if provided
@@ -868,7 +874,7 @@ func (db *Database) GetBlogByID(id int64) (*model.Blog, error) {
 
 // GetArticleByID returns an article by its ID, or nil if not found.
 func (db *Database) GetArticleByID(id int64) (*model.Article, error) {
-	row := db.conn.QueryRow(`SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status FROM articles WHERE id = ?`, id)
+	row := db.conn.QueryRow(`SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status, is_favorited FROM articles WHERE id = ?`, id)
 	return scanArticle(row)
 }
 
@@ -1194,8 +1200,9 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 		hasNote       bool
 		hnURL         sql.NullString
 		hnStatus      sql.NullString
+		isFavorited   bool
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &isFavorited); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -1210,6 +1217,7 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 		ThumbnailURL: thumbnailURL.String,
 		IsRead:       isRead,
 		HasNote:      hasNote,
+		IsFavorited:  isFavorited,
 		HNURL:        hnURL.String,
 		HNStatus:     model.HNStatus(hnStatus.String),
 	}
@@ -1268,8 +1276,9 @@ func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.A
 		hnStatus      sql.NullString
 		blogName      string
 		blogURL       string
+		isFavorited   bool
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &blogName, &blogURL); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &blogName, &blogURL, &isFavorited); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -1286,6 +1295,7 @@ func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.A
 		BlogName:     blogName,
 		BlogURL:      blogURL,
 		HasNote:      hasNote,
+		IsFavorited:  isFavorited,
 		HNURL:        hnURL.String,
 		HNStatus:     model.HNStatus(hnStatus.String),
 	}
@@ -1318,9 +1328,10 @@ func scanArticleWithBlogAndCount(scanner interface{ Scan(dest ...any) error }) (
 		hnStatus      sql.NullString
 		blogName      string
 		blogURL       string
+		isFavorited   bool
 		totalCount    int
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &blogName, &blogURL, &totalCount); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &blogName, &blogURL, &isFavorited, &totalCount); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, nil
 		}
@@ -1337,6 +1348,7 @@ func scanArticleWithBlogAndCount(scanner interface{ Scan(dest ...any) error }) (
 		HasNote:      hasNote,
 		BlogName:     blogName,
 		BlogURL:      blogURL,
+		IsFavorited:  isFavorited,
 		HNURL:        hnURL.String,
 		HNStatus:     model.HNStatus(hnStatus.String),
 	}
@@ -1444,7 +1456,7 @@ type ListFilterOptions struct {
 // 支持按博客名称、分类名称、已读状态、日期筛选，用于 CLI article list 命令
 func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.ArticleWithBlog, error) {
 	// 构建基础查询
-	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url
+	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, a.is_favorited, b.name, b.url
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id
 		WHERE 1=1`
@@ -1474,6 +1486,12 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 	if opts.HasNote != nil {
 		conditions = append(conditions, "a.has_note = ?")
 		args = append(args, *opts.HasNote)
+	}
+
+	// 收藏状态筛选
+	if opts.IsFavorited != nil {
+		conditions = append(conditions, "a.is_favorited = ?")
+		args = append(args, *opts.IsFavorited)
 	}
 
 	// 日期筛选（使用 published_date 或 discovered_date）
@@ -1833,6 +1851,12 @@ func buildFilterConditions(opts ListFilterOptions) ([]string, []interface{}) {
 	if opts.HasNote != nil {
 		conditions = append(conditions, "a.has_note = ?")
 		args = append(args, *opts.HasNote)
+	}
+
+	// 收藏状态筛选
+	if opts.IsFavorited != nil {
+		conditions = append(conditions, "a.is_favorited = ?")
+		args = append(args, *opts.IsFavorited)
 	}
 
 	// 日期筛选（使用 published_date 或 discovered_date）
