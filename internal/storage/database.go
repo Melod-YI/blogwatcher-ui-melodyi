@@ -671,7 +671,8 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 	if opts.SearchQuery != "" {
 		query.WriteString(` JOIN articles_fts ON a.id = articles_fts.rowid`)
 		conditions = append(conditions, "articles_fts MATCH ?")
-		args = append(args, opts.SearchQuery)
+		// 清理 FTS5 查询，处理特殊字符
+		args = append(args, sanitizeFTS5Query(opts.SearchQuery))
 	}
 
 	query.WriteString(` INNER JOIN blogs b ON a.blog_id = b.id`)
@@ -976,7 +977,7 @@ func (db *Database) AddArticlesBulk(articles []model.Article) (inserted int, ski
 	if err != nil {
 		return 0, 0, err
 	}
-	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO articles (blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO articles (blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, hn_url, hn_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		_ = tx.Rollback()
 		return 0, 0, err
@@ -992,6 +993,8 @@ func (db *Database) AddArticlesBulk(articles []model.Article) (inserted int, ski
 			formatTimePtr(article.PublishedDate),
 			formatTimePtr(article.DiscoveredDate),
 			article.IsRead,
+			nullIfEmpty(article.HNURL),
+			article.HNStatus,
 		)
 		if err != nil {
 			_ = tx.Rollback()
@@ -1038,6 +1041,60 @@ func (db *Database) GetExistingArticleURLs(urls []string) (map[string]struct{}, 
 				return nil, err
 			}
 			result[url] = struct{}{}
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+	}
+	return result, nil
+}
+
+// ExistingArticleInfo 存储现有文章的 HN 信息
+type ExistingArticleInfo struct {
+	ID      int64
+	HNURL   string
+	HNStatus model.HNStatus
+}
+
+// GetExistingArticlesWithHNInfo 返回 URL 到文章 ID 和 HN 信息的映射
+// 用于在扫描时检测重复文章并更新 HN 链接（如果新来源有 HN 链接）
+func (db *Database) GetExistingArticlesWithHNInfo(urls []string) (map[string]ExistingArticleInfo, error) {
+	result := make(map[string]ExistingArticleInfo)
+	if len(urls) == 0 {
+		return result, nil
+	}
+
+	chunkSize := 900
+	for start := 0; start < len(urls); start += chunkSize {
+		end := start + chunkSize
+		if end > len(urls) {
+			end = len(urls)
+		}
+		chunk := urls[start:end]
+		placeholders := strings.TrimRight(strings.Repeat("?,", len(chunk)), ",")
+		query := fmt.Sprintf("SELECT url, id, hn_url, hn_status FROM articles WHERE url IN (%s)", placeholders)
+		rows, err := db.conn.Query(query, interfaceSlice(chunk)...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var (
+				url      string
+				id       int64
+				hnURL    sql.NullString
+				hnStatus sql.NullString
+			)
+			if err := rows.Scan(&url, &id, &hnURL, &hnStatus); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			result[url] = ExistingArticleInfo{
+				ID:      id,
+				HNURL:   hnURL.String,
+				HNStatus: model.HNStatus(hnStatus.String),
+			}
 		}
 		if err := rows.Err(); err != nil {
 			rows.Close()
@@ -1336,6 +1393,7 @@ type ListFilterOptions struct {
 	CategoryName string     // 分类名称筛选（空表示所有分类）
 	IsRead       *bool      // 已读状态筛选（nil 表示所有状态）
 	HasNote      *bool      // 备注状态筛选（nil 表示所有状态，false 表示无备注）
+	IsFavorited  *bool      // 收藏状态筛选（nil 表示所有状态）
 	AfterDate    *time.Time // 日期筛选（nil 表示无限制）
 	Limit        int        // 结果数量限制（0 表示无限制）
 	Offset       int        // 结果偏移量（用于翻页）
@@ -1763,4 +1821,29 @@ func (db *Database) CountArticlesWithFilters(opts ListFilterOptions) (int64, err
 	var count int64
 	err := db.conn.QueryRow(query, args...).Scan(&count)
 	return count, err
+}
+
+// sanitizeFTS5Query 清理 FTS5 全文搜索查询，处理特殊字符
+// FTS5 特殊字符: -, ^, *, (, ), :, " 以及空格作为分词符
+// 当查询包含特殊字符时，用双引号包裹整个查询，使其作为短语匹配
+func sanitizeFTS5Query(query string) string {
+	if query == "" {
+		return query
+	}
+
+	// FTS5 特殊字符，需要转义或引用
+	fts5SpecialChars := []string{"-", "^", "*", "(", ")", ":", " ", `"`}
+
+	// 检查是否包含特殊字符
+	for _, char := range fts5SpecialChars {
+		if strings.Contains(query, char) {
+			// 用双引号包裹，作为短语进行精确匹配
+			// 注意：双引号本身需要转义为两个双引号
+			escaped := strings.ReplaceAll(query, `"`, `""`)
+			return `"` + escaped + `"`
+		}
+	}
+
+	// 无特殊字符，直接返回
+	return query
 }

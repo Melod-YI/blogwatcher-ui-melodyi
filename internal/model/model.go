@@ -31,6 +31,7 @@ type Article struct {
 	DiscoveredDate *time.Time
 	IsRead         bool
 	HasNote        bool // 文章备注状态
+	IsFavorited    bool // 文章收藏状态
 	HNURL          string   // Hacker News 讨论链接
 	HNStatus       HNStatus // HN 链接搜索状态
 }
@@ -49,6 +50,7 @@ type ArticleWithBlog struct {
 	BlogName       string
 	BlogURL        string
 	HasNote        bool // 文章备注状态
+	IsFavorited    bool // 文章收藏状态
 	HNURL          string   // Hacker News 讨论链接
 	HNStatus       HNStatus // HN 链接搜索状态
 }
@@ -58,6 +60,7 @@ type ArticleWithBlog struct {
 type SearchOptions struct {
 	SearchQuery string     // FTS5 search query (empty = skip FTS5)
 	IsRead      *bool      // nil = all, true = read only, false = unread only
+	IsFavorited *bool      // nil = all, true = favorited only, false = non-favorited only
 	BlogID      *int64     // nil = all blogs
 	DateFrom    *time.Time // nil = no lower bound
 	DateTo      *time.Time // nil = no upper bound
