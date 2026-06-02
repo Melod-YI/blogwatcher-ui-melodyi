@@ -24,22 +24,25 @@ func FormatTable(articles []model.ArticleWithBlog, meta PaginationMeta) string {
 	titleWidth := 50
 	blogWidth := 20
 	statusWidth := 8
+	favWidth := 5
 	timeWidth := 20
 
 	// 构建表头
-	header := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s |",
+	header := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |",
 		idWidth, "ID",
 		titleWidth, "Title",
 		blogWidth, "Blog",
 		statusWidth, "Status",
+		favWidth, "Fav",
 		timeWidth, "Published")
 
 	// 构建分隔线
-	separator := fmt.Sprintf("|-%s-|-%s-|-%s-|-%s-|-%s-|",
+	separator := fmt.Sprintf("|-%s-|-%s-|-%s-|-%s-|-%s-|-%s-|",
 		strings.Repeat("-", idWidth),
 		strings.Repeat("-", titleWidth),
 		strings.Repeat("-", blogWidth),
 		strings.Repeat("-", statusWidth),
+		strings.Repeat("-", favWidth),
 		strings.Repeat("-", timeWidth))
 
 	// 构建各行
@@ -60,14 +63,21 @@ func FormatTable(articles []model.ArticleWithBlog, meta PaginationMeta) string {
 			status = "已读"
 		}
 
+		// 收藏标记
+		fav := ""
+		if article.IsFavorited {
+			fav = "★"
+		}
+
 		// 时间（相对时间或日期）
 		published := formatTime(article.PublishedDate, article.DiscoveredDate)
 
-		row := fmt.Sprintf("| %-*d | %-*s | %-*s | %-*s | %-*s |",
+		row := fmt.Sprintf("| %-*d | %-*s | %-*s | %-*s | %-*s | %-*s |",
 			idWidth, article.ID,
 			titleWidth, title,
 			blogWidth, blogName,
 			statusWidth, status,
+			favWidth, fav,
 			timeWidth, published)
 
 		rows = append(rows, row)

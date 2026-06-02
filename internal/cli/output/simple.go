@@ -29,10 +29,17 @@ func FormatSimple(articles []model.ArticleWithBlog, meta PaginationMeta) string 
 		// 时间
 		published := formatSimpleTime(article.PublishedDate, article.DiscoveredDate)
 
+		// 收藏标记
+		favMark := ""
+		if article.IsFavorited {
+			favMark = " ★"
+		}
+
 		// 构建行
-		line := fmt.Sprintf("%s %s (%s) - %s",
+		line := fmt.Sprintf("%s %s%s (%s) - %s",
 			status,
 			article.Title,
+			favMark,
 			article.BlogName,
 			published)
 

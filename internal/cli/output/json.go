@@ -16,9 +16,10 @@ type ArticleJSONOutput struct {
 	Title     string `json:"title"`
 	URL       string `json:"url"`
 	Blog      string `json:"blog"`
-	Read      bool   `json:"read"`
-	HasNote   bool   `json:"has_note"`
-	Published string `json:"published,omitempty"`
+	Read        bool   `json:"read"`
+	HasNote     bool   `json:"has_note"`
+	IsFavorited bool   `json:"is_favorited"`
+	Published   string `json:"published,omitempty"`
 	HNURL     string `json:"hn_url,omitempty"`
 	HNStatus  string `json:"hn_status,omitempty"`
 }
@@ -40,8 +41,9 @@ func FormatJSON(articles []model.ArticleWithBlog, meta PaginationMeta) string {
 			Title:    article.Title,
 			URL:      article.URL,
 			Blog:     article.BlogName,
-			Read:     article.IsRead,
-			HasNote:  article.HasNote,
+			Read:        article.IsRead,
+			HasNote:     article.HasNote,
+			IsFavorited: article.IsFavorited,
 			HNURL:    article.HNURL,
 			HNStatus: string(article.HNStatus),
 		}
