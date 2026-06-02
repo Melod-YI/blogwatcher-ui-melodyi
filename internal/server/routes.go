@@ -22,6 +22,8 @@ func (s *Server) registerRoutes() {
 	// Article management actions
 	s.mux.HandleFunc("POST /articles/{id}/read", s.handleMarkRead)
 	s.mux.HandleFunc("POST /articles/{id}/unread", s.handleMarkUnread)
+	s.mux.HandleFunc("POST /articles/{id}/favorite", s.handleFavorite)
+	s.mux.HandleFunc("POST /articles/{id}/unfavorite", s.handleUnfavorite)
 	s.mux.HandleFunc("POST /articles/mark-all-read", s.handleMarkAllRead)
 
 	// Sync

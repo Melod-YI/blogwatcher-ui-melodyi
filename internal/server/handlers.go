@@ -262,6 +262,101 @@ func (s *Server) handleMarkUnread(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// handleFavorite marks an article as favorited and returns the updated article card
+func (s *Server) handleFavorite(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("handleFavorite: favoriting article %d", id)
+
+	if err := s.db.FavoriteArticle(id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Article not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error favoriting article %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("handleFavorite: article %d favorited successfully", id)
+
+	// Return the updated article card for HTMX swap
+	s.renderUpdatedArticleCard(w, id)
+}
+
+// handleUnfavorite removes the favorite mark from an article and returns the updated card
+func (s *Server) handleUnfavorite(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("handleUnfavorite: unfavoriting article %d", id)
+
+	if err := s.db.UnfavoriteArticle(id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Article not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error unfavoriting article %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("handleUnfavorite: article %d unfavorited successfully", id)
+
+	// Return the updated article card for HTMX swap
+	s.renderUpdatedArticleCard(w, id)
+}
+
+// renderUpdatedArticleCard fetches an article with blog info and renders just the card partial.
+func (s *Server) renderUpdatedArticleCard(w http.ResponseWriter, id int64) {
+	article, err := s.db.GetArticleByID(id)
+	if err != nil || article == nil {
+		log.Printf("Error fetching article %d for card re-render: %v", id, err)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	blog, err := s.db.GetBlogByID(article.BlogID)
+	if err != nil || blog == nil {
+		log.Printf("Error fetching blog %d for article card: %v", article.BlogID, err)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	articleWithBlog := model.ArticleWithBlog{
+		ID:             article.ID,
+		BlogID:         article.BlogID,
+		Title:          article.Title,
+		URL:            article.URL,
+		ThumbnailURL:   article.ThumbnailURL,
+		PublishedDate:  article.PublishedDate,
+		DiscoveredDate: article.DiscoveredDate,
+		IsRead:         article.IsRead,
+		HasNote:        article.HasNote,
+		IsFavorited:    article.IsFavorited,
+		HNURL:          article.HNURL,
+		HNStatus:       article.HNStatus,
+		BlogName:       blog.Name,
+		BlogURL:        blog.URL,
+	}
+
+	data := map[string]interface{}{
+		"Articles":       []model.ArticleWithBlog{articleWithBlog},
+		"DisplayedCount": 0,
+		"ArticleCount":   0,
+	}
+	s.renderTemplate(w, "article-items.gohtml", data)
+}
+
 // handleMarkAllRead marks all unread articles as read and returns refreshed article list
 func (s *Server) handleMarkAllRead(w http.ResponseWriter, r *http.Request) {
 	// Parse optional blog filter from query params
@@ -482,6 +577,11 @@ func parseSearchOptions(r *http.Request) (model.SearchOptions, string, int64) {
 		isRead := false
 		opts.IsRead = &isRead
 		filter = "unread" // Default
+	case "favorites":
+		isFav := true
+		opts.IsFavorited = &isFav
+		// Don't set IsRead filter — show both read and unread favorited articles
+		opts.IsRead = nil
 	default:
 		isRead := false
 		opts.IsRead = &isRead
