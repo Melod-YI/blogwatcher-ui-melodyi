@@ -4,6 +4,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/esttorhe/blogwatcher-ui/v2/assets"
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/storage"
 )
 
@@ -279,6 +281,86 @@ func TestHandleAPISync_GetDoesNotReturnJSON(t *testing.T) {
 	ct := rec.Header().Get("Content-Type")
 	if ct == "application/json" {
 		t.Errorf("GET /api/sync should not return JSON, got Content-Type = %q", ct)
+	}
+}
+
+func TestHandleFavoriteAndUnfavorite(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+
+	// Create blog and article
+	blog, err := db.AddBlog(model.Blog{Name: "Test Blog", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+	inserted, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "Test Article", URL: "https://example.com/test-fav", HNStatus: model.HNStatusNotSearch},
+	})
+	if err != nil || inserted == 0 {
+		t.Fatalf("insert article: inserted=%d, err=%v", inserted, err)
+	}
+	articles, err := db.ListArticles(false, nil)
+	if err != nil || len(articles) == 0 {
+		t.Fatalf("list articles: err=%v, len=%d", err, len(articles))
+	}
+	articleID := articles[0].ID
+
+	// Test favorite
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/articles/%d/favorite", articleID), nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("favorite: status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	// Verify in DB
+	article, err := db.GetArticleByID(articleID)
+	if err != nil {
+		t.Fatalf("get article after favorite: %v", err)
+	}
+	if !article.IsFavorited {
+		t.Error("expected article to be favorited after favorite endpoint")
+	}
+
+	// Test unfavorite
+	req = httptest.NewRequest(http.MethodPost, fmt.Sprintf("/articles/%d/unfavorite", articleID), nil)
+	rec = httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("unfavorite: status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	// Verify in DB
+	article, err = db.GetArticleByID(articleID)
+	if err != nil {
+		t.Fatalf("get article after unfavorite: %v", err)
+	}
+	if article.IsFavorited {
+		t.Error("expected article to not be favorited after unfavorite endpoint")
+	}
+}
+
+func TestHandleFavoriteInvalidID(t *testing.T) {
+	srv := createTestServer(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/articles/notanumber/favorite", nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d, body: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
+func TestHandleFavoriteNotFound(t *testing.T) {
+	srv := createTestServer(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/articles/99999/favorite", nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d, body: %s", rec.Code, http.StatusNotFound, rec.Body.String())
 	}
 }
 
