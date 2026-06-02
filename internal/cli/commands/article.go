@@ -30,15 +30,19 @@ func NewArticleCmd() *cobra.Command {
 		Long: `文章管理命令，提供文章列表和状态管理功能。
 
 子命令：
-  list       列出文章，支持筛选和多种输出格式
-  mark-read  标记文章已读（单篇或全部）
-  mark-unread 标记文章未读`,
+  list        列出文章，支持筛选和多种输出格式
+  mark-read   标记文章已读（单篇或全部）
+  mark-unread 标记文章未读
+  favorite    收藏文章
+  unfavorite  取消收藏文章`,
 	}
 
 	// 添加子命令
 	cmd.AddCommand(NewListCmd())
 	cmd.AddCommand(NewMarkReadCmd())
 	cmd.AddCommand(NewMarkUnreadCmd())
+	cmd.AddCommand(NewFavoriteCmd())
+	cmd.AddCommand(NewUnfavoriteCmd())
 
 	return cmd
 }
@@ -58,6 +62,7 @@ func NewListCmd() *cobra.Command {
   --read           仅显示已读文章
   --noted          仅显示有备注文章
   --not-noted      仅显示无备注文章
+  --favorited      仅显示收藏文章
   --after <date>   显示指定日期之后的文章（格式 YYYY-MM-DD）
   --limit <n>      最多返回 n 条结果（默认 20，最大 100，0 表示无限制）
   --offset <n>     跳过前 n 条结果（用于翻页）
@@ -88,6 +93,7 @@ func NewListCmd() *cobra.Command {
 	cmd.Flags().Bool("read", false, "仅已读文章")
 	cmd.Flags().Bool("noted", false, "仅有备注文章")
 	cmd.Flags().Bool("not-noted", false, "仅无备注文章")
+	cmd.Flags().Bool("favorited", false, "仅收藏文章")
 	cmd.Flags().String("after", "", "日期筛选（格式 YYYY-MM-DD）")
 	cmd.Flags().Int("limit", DefaultLimit, fmt.Sprintf("返回结果数量限制（默认 %d，最大 %d，0 表示无限制）", DefaultLimit, MaxLimit))
 	cmd.Flags().Int("offset", 0, "结果偏移量（用于翻页）")
@@ -224,6 +230,13 @@ func runList(cmd *cobra.Command, args []string) {
 		opts.HasNote = &hasNote
 	}
 	// 如果都没有设置，opts.HasNote 为 nil（所有状态）
+
+	// 设置 IsFavorited 状态筛选
+	favorited, _ := cmd.Flags().GetBool("favorited")
+	if favorited {
+		isFav := true
+		opts.IsFavorited = &isFav
+	}
 
 	// 解析日期筛选
 	if afterStr != "" {
@@ -404,4 +417,138 @@ func runMarkUnread(cmd *cobra.Command, args []string) {
 	} else {
 		fmt.Fprintf(os.Stderr, "文章 %d 不存在或已标记为未读\n", id)
 	}
+}
+
+// NewFavoriteCmd 创建 favorite 子命令
+// 必须提供文章 ID 参数
+func NewFavoriteCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "favorite <id>",
+		Short: "收藏文章",
+		Long: `收藏指定文章。
+
+示例：
+  blogwatcher article favorite 1  # 收藏文章 ID 1`,
+		Args: cobra.ExactArgs(1),
+		Run:  runFavorite,
+	}
+
+	return cmd
+}
+
+// NewUnfavoriteCmd 创建 unfavorite 子命令
+// 必须提供文章 ID 参数
+func NewUnfavoriteCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "unfavorite <id>",
+		Short: "取消收藏文章",
+		Long: `取消收藏指定文章。
+
+示例：
+  blogwatcher article unfavorite 1  # 取消收藏文章 ID 1`,
+		Args: cobra.ExactArgs(1),
+		Run:  runUnfavorite,
+	}
+
+	return cmd
+}
+
+// runFavorite 执行 favorite 命令
+// 必须提供文章 ID 参数
+func runFavorite(cmd *cobra.Command, args []string) {
+	// 获取数据库路径
+	dbPath := flags.DBPath()
+	if dbPath == "" {
+		var err error
+		dbPath, err = storage.DefaultDBPath()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "获取默认数据库路径失败: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// 打开数据库
+	db, err := storage.OpenDatabase(dbPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "打开数据库失败: %v\n", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// 解析文章 ID
+	id, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "文章 ID 格式错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 验证文章是否存在
+	article, err := db.GetArticleByID(id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "查询文章失败: %v\n", err)
+		os.Exit(1)
+	}
+	if article == nil {
+		fmt.Fprintf(os.Stderr, "文章 %d 不存在\n", id)
+		os.Exit(1)
+	}
+
+	// 收藏文章
+	err = db.FavoriteArticle(id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "收藏文章失败: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("已收藏: %s\n", article.Title)
+}
+
+// runUnfavorite 执行 unfavorite 命令
+// 必须提供文章 ID 参数
+func runUnfavorite(cmd *cobra.Command, args []string) {
+	// 获取数据库路径
+	dbPath := flags.DBPath()
+	if dbPath == "" {
+		var err error
+		dbPath, err = storage.DefaultDBPath()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "获取默认数据库路径失败: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// 打开数据库
+	db, err := storage.OpenDatabase(dbPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "打开数据库失败: %v\n", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// 解析文章 ID
+	id, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "文章 ID 格式错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 验证文章是否存在
+	article, err := db.GetArticleByID(id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "查询文章失败: %v\n", err)
+		os.Exit(1)
+	}
+	if article == nil {
+		fmt.Fprintf(os.Stderr, "文章 %d 不存在\n", id)
+		os.Exit(1)
+	}
+
+	// 取消收藏文章
+	err = db.UnfavoriteArticle(id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "取消收藏文章失败: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("已取消收藏: %s\n", article.Title)
 }
