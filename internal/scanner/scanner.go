@@ -11,6 +11,7 @@ import (
 
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/hn"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/processor"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/rss"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/scraper"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/storage"
@@ -56,12 +57,14 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 		URL           string
 		ThumbnailURL  string // only populated if RSS already provided one
 		PublishedDate *time.Time
+		HNURL         string // 如果 RSS comments 字段是 HN 链接，则直接提取
 	}
 
 	var stubs []articleStub
+	proc := processor.DefaultRegistry.Get(feedURL)
 
 	if feedURL != "" {
-		feedArticles, err := rss.ParseFeed(ctx, feedURL)
+		feedArticles, err := rss.ParseFeed(ctx, feedURL, proc)
 		if err != nil {
 			errText = err.Error()
 		} else {
@@ -72,6 +75,7 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 					URL:           a.URL,
 					ThumbnailURL:  a.ThumbnailURL, // from RSS only, no OG
 					PublishedDate: a.PublishedDate,
+					HNURL:         a.HNURL, // 如果 RSS comments 是 HN 链接则直接使用
 				})
 			}
 			source = "rss"
@@ -112,31 +116,53 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 	}
 
 	// Phase 3: Filter out articles that already exist in the database
+	// 使用带 HN 信息的查询，以便在重复文章时更新 HN 链接
 	urlList := make([]string, 0, len(seenURLs))
 	for url := range seenURLs {
 		urlList = append(urlList, url)
 	}
 
-	existing, err := db.GetExistingArticleURLs(urlList)
+	existingArticles, err := db.GetExistingArticlesWithHNInfo(urlList)
 	if err != nil {
 		errText = err.Error()
 	}
 
+	// 统计 HN 更新数量
+	hnUpdatedFromDuplicate := 0
+
 	discoveredAt := time.Now()
 	var newStubs []articleStub
 	for _, stub := range uniqueStubs {
-		if _, exists := existing[stub.URL]; exists {
+		if existingInfo, exists := existingArticles[stub.URL]; exists {
+			// 文章已存在，检查是否需要更新 HN 链接
+			// 如果新来源有 HNURL 且原记录没有 HNURL，则更新
+			if stub.HNURL != "" && existingInfo.HNURL == "" {
+				log.Printf("[Scanner] 重复文章 '%s' 从 RSS 获取到 HN 链接，更新原记录 ID %d", stub.Title, existingInfo.ID)
+				if err := db.UpdateArticleHNStatus(existingInfo.ID, stub.HNURL, model.HNStatusExact); err != nil {
+					log.Printf("[Scanner] 更新重复文章 HN 链接失败: %v", err)
+				} else {
+					hnUpdatedFromDuplicate++
+				}
+			}
 			continue
 		}
 		newStubs = append(newStubs, stub)
 	}
 
 	// Phase 4: Only for genuinely new articles, fetch OG thumbnails if needed
+	// 同时记录 RSS 直提的 HN 链接
+	hnFromRSS := 0
 	newArticles := make([]model.Article, 0, len(newStubs))
 	for _, stub := range newStubs {
 		thumbURL := stub.ThumbnailURL
 		if thumbURL == "" {
-			thumbURL = thumbnail.ExtractFromOpenGraph(ctx, stub.URL)
+			thumbURL = proc.NormalizeThumbnailURL(thumbnail.ExtractFromOpenGraph(ctx, stub.URL))
+		}
+		// 如果 RSS 已有 HN 链接，设置初始 HN 状态为精确匹配
+		hnStatus := model.HNStatusNotSearch
+		if stub.HNURL != "" {
+			hnStatus = model.HNStatusExact
+			hnFromRSS++
 		}
 		newArticles = append(newArticles, model.Article{
 			BlogID:        stub.BlogID,
@@ -146,6 +172,8 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 			PublishedDate: stub.PublishedDate,
 			DiscoveredDate: &discoveredAt,
 			IsRead:        false,
+			HNURL:         stub.HNURL,
+			HNStatus:      hnStatus,
 		})
 	}
 
@@ -161,16 +189,28 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 		}
 	}
 
-	// Phase 6: Search HN discussion for new articles
+	// Phase 6: Search HN discussion for new articles (只搜索没有 RSS 直提 HN 的文章)
 	hnSearched := 0
 	hnFound := 0
 	hnFailed := 0
 
-	if len(newArticles) > 0 {
-		log.Printf("[Scanner] 博客 '%s': 开始搜索 %d 篇新文章的 HN 讨论", blog.Name, len(newArticles))
-		for _, article := range newArticles {
+	// 统计 RSS 直提的 HN（已在新文章插入时设置）
+	hnFromRSSCount := hnFromRSS + hnUpdatedFromDuplicate
+
+	// 需要搜索的文章（排除已有 RSS 直提 HN 的）
+	var articlesToSearch []model.Article
+	for _, article := range newArticles {
+		if article.HNURL == "" && article.HNStatus == model.HNStatusNotSearch {
+			articlesToSearch = append(articlesToSearch, article)
+		}
+	}
+
+	if len(articlesToSearch) > 0 {
+		log.Printf("[Scanner] 博客 '%s': 开始搜索 %d 篇文章的 HN 讨论（RSS 直提 %d 篇已跳过）", blog.Name, len(articlesToSearch), hnFromRSS)
+		for _, article := range articlesToSearch {
 			hnSearched++
-			match, err := hn.SearchHNDiscussion(ctx, article.URL)
+			searchURL := proc.NormalizeSearchURL(article.URL)
+			match, err := hn.SearchHNDiscussion(ctx, searchURL)
 			if err != nil {
 				log.Printf("[Scanner] HN 搜索失败，文章 ID %d: %v", article.ID, err)
 				hnFailed++
@@ -178,13 +218,14 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 				continue
 			}
 
-			if match.Status == model.HNStatusExact || match.Status == model.HNStatusFuzzy {
+			if match.Status == model.HNStatusExact {
 				hnFound++
 			}
 
 			_ = db.UpdateArticleHNStatus(article.ID, match.HNURL, match.Status)
 		}
-		log.Printf("[Scanner] 博客 '%s': HN 搜索完成，找到 %d/%d，失败 %d", blog.Name, hnFound, hnSearched, hnFailed)
+	} else if hnFromRSS > 0 {
+		log.Printf("[Scanner] 博客 '%s': 所有新文章已从 RSS 直提 HN 链接（%d 篇），跳过搜索", blog.Name, hnFromRSS)
 	}
 
 	_ = db.UpdateBlogLastScanned(blog.ID, time.Now())
@@ -197,7 +238,7 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 		Source:       source,
 		Error:        errText,
 		HNSearched:   hnSearched,
-		HNFound:      hnFound,
+		HNFound:      hnFound + hnFromRSSCount, // 包括 RSS 直提和搜索找到的
 		HNFailed:     hnFailed,
 	}
 }
@@ -328,7 +369,8 @@ func SyncThumbnails(ctx context.Context, db *storage.Database) (ThumbnailSyncRes
 
 	// Process each feed
 	for feedURL, articleList := range feedArticles {
-		feedItems, err := rss.ParseFeed(ctx, feedURL)
+		proc := processor.DefaultRegistry.Get(feedURL)
+		feedItems, err := rss.ParseFeed(ctx, feedURL, proc)
 		if err != nil {
 			result.Errors += len(articleList)
 			continue
@@ -348,7 +390,7 @@ func SyncThumbnails(ctx context.Context, db *storage.Database) (ThumbnailSyncRes
 
 			// Fallback to Open Graph if RSS didn't provide thumbnail
 			if thumbnailURL == "" {
-				thumbnailURL = thumbnail.ExtractFromOpenGraph(ctx, article.URL)
+				thumbnailURL = proc.NormalizeThumbnailURL(thumbnail.ExtractFromOpenGraph(ctx, article.URL))
 			}
 
 			if thumbnailURL != "" {

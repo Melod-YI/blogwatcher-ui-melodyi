@@ -11,6 +11,7 @@ import (
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/cli/flags"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/hn"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/processor"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/storage"
 	"github.com/spf13/cobra"
 )
@@ -123,7 +124,9 @@ func runHNSync(cmd *cobra.Command, args []string) {
 		searched++
 		fmt.Printf("[%d/%d] 搜索文章 ID %d...\n", i+1, len(articles), article.ID)
 
-		match, err := hn.SearchHNDiscussion(ctx, article.URL)
+		proc := processor.DefaultRegistry.Get(article.FeedURL)
+		searchURL := proc.NormalizeSearchURL(article.URL)
+		match, err := hn.SearchHNDiscussion(ctx, searchURL)
 		if err != nil {
 			failedCount++
 			fmt.Printf("  失败: %v\n", err)

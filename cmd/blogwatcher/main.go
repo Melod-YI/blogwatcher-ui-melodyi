@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/cli/commands"
+	_ "github.com/esttorhe/blogwatcher-ui/v2/internal/processor/setup"
 )
 
 func main() {

@@ -3,17 +3,21 @@
 package rss
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/processor"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/thumbnail"
 	"github.com/mmcdole/gofeed"
+	"github.com/mmcdole/gofeed/rss"
 )
 
 type FeedArticle struct {
@@ -21,6 +25,7 @@ type FeedArticle struct {
 	URL           string
 	ThumbnailURL  string
 	PublishedDate *time.Time
+	HNURL         string // 如果 RSS comments 字段是 HN 链接，则直接提取
 }
 
 type FeedParseError struct {
@@ -31,7 +36,7 @@ func (e FeedParseError) Error() string {
 	return e.Message
 }
 
-func ParseFeed(ctx context.Context, feedURL string) ([]FeedArticle, error) {
+func ParseFeed(ctx context.Context, feedURL string, proc processor.BlogProcessor) ([]FeedArticle, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
 	if err != nil {
 		return nil, FeedParseError{Message: fmt.Sprintf("failed to build request: %v", err)}
@@ -46,29 +51,111 @@ func ParseFeed(ctx context.Context, feedURL string) ([]FeedArticle, error) {
 		return nil, FeedParseError{Message: fmt.Sprintf("failed to fetch feed: status %d", response.StatusCode)}
 	}
 
-	parser := gofeed.NewParser()
-	feed, err := parser.Parse(response.Body)
-	if err != nil {
-		return nil, FeedParseError{Message: fmt.Sprintf("failed to parse feed: %v", err)}
-	}
+	// 使用 TeeReader 来同时检测类型和解析
+	var buf bytes.Buffer
+	tee := io.TeeReader(response.Body, &buf)
+	feedType := gofeed.DetectFeedType(tee)
+
+	// 重新组装 reader 以供解析
+	r := io.MultiReader(&buf, response.Body)
 
 	var articles []FeedArticle
-	for _, item := range feed.Items {
-		title := strings.TrimSpace(item.Title)
-		link := strings.TrimSpace(item.Link)
-		if title == "" || link == "" {
-			continue
+
+	switch feedType {
+	case gofeed.FeedTypeRSS:
+		// 使用底层 RSS Parser 来获取 Comments 字段
+		rp := &rss.Parser{}
+		rssFeed, err := rp.Parse(r)
+		if err != nil {
+			return nil, FeedParseError{Message: fmt.Sprintf("failed to parse RSS feed: %v", err)}
 		}
-		thumbnailURL := thumbnail.ExtractFromRSS(item)
-		articles = append(articles, FeedArticle{
-			Title:         title,
-			URL:           link,
-			ThumbnailURL:  thumbnailURL,
-			PublishedDate: pickPublishedDate(item),
-		})
+
+		// 使用默认翻译器获取通用 Feed（用于 thumbnail 等信息）
+		translator := &gofeed.DefaultRSSTranslator{}
+		genericFeed, err := translator.Translate(rssFeed)
+		if err != nil {
+			return nil, FeedParseError{Message: fmt.Sprintf("failed to translate RSS feed: %v", err)}
+		}
+
+		// 建立 URL 到 RSS Item 的映射（用于获取 Comments）
+		rssItemMap := make(map[string]*rss.Item)
+		for _, item := range rssFeed.Items {
+			link := strings.TrimSpace(item.Link)
+			if link != "" {
+				link = proc.NormalizeArticleURL(link)
+				rssItemMap[link] = item
+			}
+		}
+
+		// 处理通用 Feed 的 Items
+		for _, item := range genericFeed.Items {
+			title := strings.TrimSpace(item.Title)
+			link := strings.TrimSpace(item.Link)
+			if title == "" || link == "" {
+				continue
+			}
+			link = proc.NormalizeArticleURL(link)
+
+			// 从原始 RSS Item 提取 HN 链接
+			hnURL := ""
+			if rssItem, ok := rssItemMap[link]; ok {
+				hnURL = extractHNURLFromComments(rssItem.Comments)
+			}
+
+			thumbnailURL := proc.NormalizeThumbnailURL(thumbnail.ExtractFromRSS(item))
+			articles = append(articles, FeedArticle{
+				Title:         title,
+				URL:           link,
+				ThumbnailURL:  thumbnailURL,
+				PublishedDate: pickPublishedDate(item),
+				HNURL:         hnURL,
+			})
+		}
+
+	default:
+		// 对于 Atom 和 JSON Feed，使用通用 Parser
+		parser := gofeed.NewParser()
+		feed, err := parser.Parse(r)
+		if err != nil {
+			return nil, FeedParseError{Message: fmt.Sprintf("failed to parse feed: %v", err)}
+		}
+
+		for _, item := range feed.Items {
+			title := strings.TrimSpace(item.Title)
+			link := strings.TrimSpace(item.Link)
+			if title == "" || link == "" {
+				continue
+			}
+			link = proc.NormalizeArticleURL(link)
+			thumbnailURL := proc.NormalizeThumbnailURL(thumbnail.ExtractFromRSS(item))
+			articles = append(articles, FeedArticle{
+				Title:         title,
+				URL:           link,
+				ThumbnailURL:  thumbnailURL,
+				PublishedDate: pickPublishedDate(item),
+				HNURL:         "", // Atom/JSON feed 没有 Comments 字段
+			})
+		}
 	}
 
 	return articles, nil
+}
+
+// extractHNURLFromComments 从 RSS Item 的 Comments 字段提取 HN 链接
+// 如果 Comments 是 HN 链接格式（https://news.ycombinator.com/item?id=...），则返回该链接
+func extractHNURLFromComments(comments string) string {
+	comments = strings.TrimSpace(comments)
+	if comments == "" {
+		return ""
+	}
+
+	// 检查是否是 HN 链接
+	const hnPrefix = "https://news.ycombinator.com/item?id="
+	if strings.HasPrefix(comments, hnPrefix) {
+		return comments
+	}
+
+	return ""
 }
 
 func DiscoverFeedURL(ctx context.Context, blogURL string) (string, error) {

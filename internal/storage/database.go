@@ -1763,8 +1763,9 @@ func (db *Database) UpdateArticleHNStatus(id int64, hnURL string, status model.H
 
 // ArticleForHNSync 用于 HN 同步的文章数据
 type ArticleForHNSync struct {
-	ID  int64
-	URL string
+	ID      int64
+	URL     string
+	FeedURL string
 }
 
 // GetArticlesForHNSync 返回需要 HN 搜索的文章列表
@@ -1776,12 +1777,12 @@ func (db *Database) GetArticlesForHNSync(mode string, blogName string, limit int
 	var query string
 	var args []interface{}
 
-	// 基础查询
-	query = `SELECT a.id, a.url FROM articles a`
+	// 基础查询 - 始终 JOIN blogs 以获取 feed_url 用于 processor 查找
+	query = `SELECT a.id, a.url, COALESCE(b.feed_url, '') FROM articles a INNER JOIN blogs b ON a.blog_id = b.id`
 
 	// 博客筛选
 	if blogName != "" {
-		query += ` INNER JOIN blogs b ON a.blog_id = b.id WHERE b.name = ?`
+		query += ` WHERE b.name = ?`
 		args = append(args, blogName)
 		query += ` AND`
 	} else {
@@ -1816,7 +1817,7 @@ func (db *Database) GetArticlesForHNSync(mode string, blogName string, limit int
 	var articles []ArticleForHNSync
 	for rows.Next() {
 		var a ArticleForHNSync
-		if err := rows.Scan(&a.ID, &a.URL); err != nil {
+		if err := rows.Scan(&a.ID, &a.URL, &a.FeedURL); err != nil {
 			return nil, err
 		}
 		articles = append(articles, a)

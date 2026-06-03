@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/processor"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/rss"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/scanner"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/service"
@@ -1219,7 +1220,8 @@ func (s *Server) handleBlogPreview(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handleBlogPreview: discovered feed URL '%s' for blog '%s' at '%s'", feedURL, name, blogURL)
 
 	// Parse Feed (PREV-02)
-	articles, err := rss.ParseFeed(ctx, feedURL)
+	proc := processor.DefaultRegistry.Get(feedURL)
+	articles, err := rss.ParseFeed(ctx, feedURL, proc)
 	if err != nil {
 		log.Printf("handleBlogPreview: failed to parse feed '%s': %v", feedURL, err)
 		var errorMsg string

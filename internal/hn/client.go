@@ -48,13 +48,48 @@ func isRateLimitError(statusCode int) bool {
 	return statusCode == 429
 }
 
+// normalizeURL 归一化 URL，消除常见的格式差异以便比较
+// 处理：尾部斜杠、协议(http/https)、www 前缀、域名大小写
+func normalizeURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+
+	// 获取主机名（去除端口）
+	host := u.Hostname()
+	if host == "" {
+		host = u.Host
+	}
+
+	// 去除 www 前缀
+	host = strings.TrimPrefix(strings.ToLower(host), "www.")
+
+	// 去除路径尾部斜杠（保留根路径 "/"）
+	path := strings.TrimRight(u.Path, "/")
+	if path == "" {
+		path = "/"
+	}
+
+	// 重建 URL（不含协议），用于比较
+	result := host + path
+	if u.RawQuery != "" {
+		result += "?" + u.RawQuery
+	}
+	if u.Fragment != "" {
+		result += "#" + u.Fragment
+	}
+
+	return result
+}
+
 // SearchHNDiscussion 搜索指定 URL 的 HN 讨论
 // 返回匹配结果和可能的错误
 func SearchHNDiscussion(ctx context.Context, articleURL string) (MatchResult, error) {
 	log.Printf("[HN] 开始搜索文章 URL: %s", articleURL)
 
-	// 构建请求 URL
-	queryURL := fmt.Sprintf("%s?query=%s", algoliaAPIURL, url.QueryEscape(articleURL))
+	// 构建请求 URL：限定只搜索 story 且只匹配 URL 字段
+	queryURL := fmt.Sprintf("%s?query=%s&tags=story&restrictSearchableAttributes=url", algoliaAPIURL, url.QueryEscape(articleURL))
 
 	var resp *http.Response
 	var err error
@@ -125,86 +160,20 @@ func SearchHNDiscussion(ctx context.Context, articleURL string) (MatchResult, er
 		return MatchResult{HNURL: "", Status: model.HNStatusNotFound}, nil
 	}
 
-	// 寻找精确匹配
+	// 寻找精确匹配（使用 URL 归一化比较）
+	normalizedArticleURL := normalizeURL(articleURL)
 	for _, hit := range algoliaResp.Hits {
-		if hit.URL == articleURL {
+		if normalizeURL(hit.URL) == normalizedArticleURL {
 			hnURL := fmt.Sprintf("https://news.ycombinator.com/item?id=%s", hit.ObjectID)
 			log.Printf("[HN] 找到精确匹配，HN ID: %s", hit.ObjectID)
 			return MatchResult{HNURL: hnURL, Status: model.HNStatusExact}, nil
 		}
 	}
 
-	// 无精确匹配，选择最佳模糊匹配
-	bestHit := selectBestFuzzyMatch(algoliaResp.Hits, articleURL)
-	hnURL := fmt.Sprintf("https://news.ycombinator.com/item?id=%s", bestHit.ObjectID)
-	log.Printf("[HN] 使用模糊匹配，HN ID: %s, 原URL: %s", bestHit.ObjectID, bestHit.URL)
-	return MatchResult{HNURL: hnURL, Status: model.HNStatusFuzzy}, nil
-}
-
-// selectBestFuzzyMatch 选择最佳模糊匹配结果
-// 优先选择 URL 相似度最高的，其次按点赞数排序
-func selectBestFuzzyMatch(hits []SearchResult, articleURL string) SearchResult {
-	// 提取域名用于相似度判断
-	articleDomain := extractDomain(articleURL)
-
-	// 计算每个结果的相似度分数
-	bestScore := -1
-	bestHit := hits[0] // 默认第一个
-
-	for _, hit := range hits {
-		score := calculateSimilarityScore(hit.URL, articleURL, articleDomain, hit.Points)
-		if score > bestScore {
-			bestScore = score
-			bestHit = hit
-		}
+	// 无精确匹配，记录归一化后的 URL 以便调试
+	log.Printf("[HN] 无精确匹配，状态: not_found (归一化后: %s)", normalizedArticleURL)
+	for _, hit := range algoliaResp.Hits {
+		log.Printf("[HN]   候选 URL: %s (归一化后: %s)", hit.URL, normalizeURL(hit.URL))
 	}
-
-	return bestHit
-}
-
-// extractDomain 从 URL 提取域名
-func extractDomain(rawURL string) string {
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		// 尝试添加协议
-		parsed, err = url.Parse("https://" + rawURL)
-		if err != nil {
-			return ""
-		}
-	}
-	return parsed.Host
-}
-
-// calculateSimilarityScore 计算 URL 相似度分数
-// 分数越高表示匹配度越好
-func calculateSimilarityScore(hitURL, articleURL, articleDomain string, points int) int {
-	score := 0
-
-	hitDomain := extractDomain(hitURL)
-
-	// 域名匹配加分（最高优先级）
-	if hitDomain == articleDomain {
-		score += 100
-	}
-
-	// URL 前缀匹配加分
-	if strings.HasPrefix(articleURL, hitURL) || strings.HasPrefix(hitURL, articleURL) {
-		score += 50
-	}
-
-	// URL 包含关系加分
-	if strings.Contains(hitURL, articleURL) || strings.Contains(articleURL, hitURL) {
-		score += 30
-	}
-
-	// 点赞数作为次要排序（归一化到 0-20）
-	if points > 0 {
-		pointScore := points / 10
-		if pointScore > 20 {
-			pointScore = 20
-		}
-		score += pointScore
-	}
-
-	return score
+	return MatchResult{HNURL: "", Status: model.HNStatusNotFound}, nil
 }

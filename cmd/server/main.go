@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/esttorhe/blogwatcher-ui/v2/assets"
+	_ "github.com/esttorhe/blogwatcher-ui/v2/internal/processor/setup"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/server"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/storage"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/version"
