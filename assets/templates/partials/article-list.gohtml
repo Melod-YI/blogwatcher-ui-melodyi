@@ -128,7 +128,7 @@
 <div id="articles-container">
 {{if .Articles}}
 {{range .Articles}}
-<article class="article-card" id="article-{{.ID}}">
+<article class="article-card{{if .IsRead}} article-card-read{{end}}" id="article-{{.ID}}">
     {{if .ThumbnailURL}}
     <img class="article-thumbnail"
          src="{{.ThumbnailURL}}"

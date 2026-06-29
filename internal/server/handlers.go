@@ -215,7 +215,9 @@ func (s *Server) handleBlogListGrouped(w http.ResponseWriter, r *http.Request) {
 	s.renderTemplate(w, "category-group.gohtml", data)
 }
 
-// handleMarkRead marks an article as read and returns empty response for HTMX swap
+// handleMarkRead marks an article as read.
+// On the favorites page, returns the updated card to keep it visible.
+// On other pages (e.g. unread), returns empty response so HTMX removes the card.
 func (s *Server) handleMarkRead(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -223,6 +225,8 @@ func (s *Server) handleMarkRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid article ID", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("handleMarkRead: marking article %d as read", id)
 
 	found, err := s.db.MarkArticleRead(id)
 	if err != nil {
@@ -235,11 +239,21 @@ func (s *Server) handleMarkRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return 200 OK with empty body - HTMX outerHTML swap will remove the card
+	log.Printf("handleMarkRead: article %d marked as read successfully", id)
+
+	// On favorites page, re-render the card so it stays visible
+	if strings.Contains(r.Referer(), "filter=favorites") {
+		s.renderUpdatedArticleCard(w, id)
+		return
+	}
+
+	// On other pages (e.g. unread), return empty body so HTMX outerHTML swap removes the card
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleMarkUnread marks an article as unread and returns empty response for HTMX swap
+// handleMarkUnread marks an article as unread.
+// On the favorites page, returns the updated card to keep it visible.
+// On other pages, returns empty response so HTMX removes the card.
 func (s *Server) handleMarkUnread(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -247,6 +261,8 @@ func (s *Server) handleMarkUnread(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid article ID", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("handleMarkUnread: marking article %d as unread", id)
 
 	found, err := s.db.MarkArticleUnread(id)
 	if err != nil {
@@ -259,7 +275,15 @@ func (s *Server) handleMarkUnread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return 200 OK with empty body - HTMX outerHTML swap will remove the card
+	log.Printf("handleMarkUnread: article %d marked as unread successfully", id)
+
+	// On favorites page, re-render the card so it stays visible
+	if strings.Contains(r.Referer(), "filter=favorites") {
+		s.renderUpdatedArticleCard(w, id)
+		return
+	}
+
+	// On other pages, return empty body so HTMX outerHTML swap removes the card
 	w.WriteHeader(http.StatusOK)
 }
 

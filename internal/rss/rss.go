@@ -94,6 +94,9 @@ func ParseFeed(ctx context.Context, feedURL string, proc processor.BlogProcessor
 			if title == "" || link == "" {
 				continue
 			}
+			if proc.ShouldSkipArticle(title) {
+				continue
+			}
 			link = proc.NormalizeArticleURL(link)
 
 			// 从原始 RSS Item 提取 HN 链接
@@ -124,6 +127,9 @@ func ParseFeed(ctx context.Context, feedURL string, proc processor.BlogProcessor
 			title := strings.TrimSpace(item.Title)
 			link := strings.TrimSpace(item.Link)
 			if title == "" || link == "" {
+				continue
+			}
+			if proc.ShouldSkipArticle(title) {
 				continue
 			}
 			link = proc.NormalizeArticleURL(link)

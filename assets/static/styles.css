@@ -287,6 +287,15 @@ p {
   background-color: var(--bg-elevated);
 }
 
+.article-card-read {
+  background-color: var(--bg-muted);
+  opacity: 0.75;
+}
+
+.article-card-read:hover {
+  opacity: 0.9;
+}
+
 .article-favicon {
   flex-shrink: 0;
   width: 32px;

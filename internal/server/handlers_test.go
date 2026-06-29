@@ -364,6 +364,133 @@ func TestHandleFavoriteNotFound(t *testing.T) {
 	}
 }
 
+func TestHandleMarkReadFromFavoritesReturnsCard(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+
+	// Create blog and article
+	blog, err := db.AddBlog(model.Blog{Name: "Test Blog", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+	inserted, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "Fav Article", URL: "https://example.com/fav-read", HNStatus: model.HNStatusNotSearch},
+	})
+	if err != nil || inserted == 0 {
+		t.Fatalf("insert article: inserted=%d, err=%v", inserted, err)
+	}
+	articles, err := db.ListArticles(false, nil)
+	if err != nil || len(articles) == 0 {
+		t.Fatalf("list articles: err=%v, len=%d", err, len(articles))
+	}
+	articleID := articles[0].ID
+
+	// Favorite the article first
+	if err := db.FavoriteArticle(articleID); err != nil {
+		t.Fatalf("favorite article: %v", err)
+	}
+
+	// Mark as read from favorites page
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/articles/%d/read", articleID), nil)
+	req.Header.Set("Referer", "http://localhost:8080/articles?filter=favorites")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	// Should return the article card (not empty)
+	body := rec.Body.String()
+	if !strings.Contains(body, "Fav Article") {
+		t.Errorf("expected article card in response on favorites page, got empty or wrong body: %s", body)
+	}
+}
+
+func TestHandleMarkReadFromUnreadReturnsEmpty(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+
+	// Create blog and article
+	blog, err := db.AddBlog(model.Blog{Name: "Test Blog", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+	inserted, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "Unread Article", URL: "https://example.com/unread-test", HNStatus: model.HNStatusNotSearch},
+	})
+	if err != nil || inserted == 0 {
+		t.Fatalf("insert article: inserted=%d, err=%v", inserted, err)
+	}
+	articles, err := db.ListArticles(false, nil)
+	if err != nil || len(articles) == 0 {
+		t.Fatalf("list articles: err=%v, len=%d", err, len(articles))
+	}
+	articleID := articles[0].ID
+
+	// Mark as read from unread page (no favorites filter in Referer)
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/articles/%d/read", articleID), nil)
+	req.Header.Set("Referer", "http://localhost:8080/articles?filter=unread")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	// Should return empty body so HTMX removes the card
+	body := rec.Body.String()
+	if body != "" {
+		t.Errorf("expected empty body on unread page, got: %s", body)
+	}
+}
+
+func TestHandleMarkUnreadFromFavoritesReturnsCard(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+
+	// Create blog and article
+	blog, err := db.AddBlog(model.Blog{Name: "Test Blog", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+	inserted, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "Read Fav Article", URL: "https://example.com/read-fav", HNStatus: model.HNStatusNotSearch},
+	})
+	if err != nil || inserted == 0 {
+		t.Fatalf("insert article: inserted=%d, err=%v", inserted, err)
+	}
+	articles, err := db.ListArticles(false, nil)
+	if err != nil || len(articles) == 0 {
+		t.Fatalf("list articles: err=%v, len=%d", err, len(articles))
+	}
+	articleID := articles[0].ID
+
+	// Favorite and mark as read
+	if err := db.FavoriteArticle(articleID); err != nil {
+		t.Fatalf("favorite article: %v", err)
+	}
+	if _, err := db.MarkArticleRead(articleID); err != nil {
+		t.Fatalf("mark read: %v", err)
+	}
+
+	// Mark as unread from favorites page
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/articles/%d/unread", articleID), nil)
+	req.Header.Set("Referer", "http://localhost:8080/articles?filter=favorites")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	// Should return the article card (not empty)
+	body := rec.Body.String()
+	if !strings.Contains(body, "Read Fav Article") {
+		t.Errorf("expected article card in response on favorites page, got: %s", body)
+	}
+}
+
 func createTestServer(t *testing.T) http.Handler {
 	t.Helper()
 

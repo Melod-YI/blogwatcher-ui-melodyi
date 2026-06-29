@@ -72,6 +72,8 @@ blogwatcher article list --blog <name>
 
 ## 特殊处理
 
-### simonwillison.net URL 处理
+### simonwillison.net 处理
 
-simonwillison.net 的 atom/everything feed 中的文章链接包含 `/#atom-everything` 后缀，这会导致 HN 搜索功能无法正确匹配。RSS 解析时会自动去除该后缀，无需手动处理。
+**URL 清洗**：simonwillison.net 的所有 atom feed（everything、notes、links 等）中的文章链接包含 `/#atom-xxx` 后缀（如 `/#atom-everything`、`/#atom-notes`、`/#atom-blogmarks`），这会导致 HN 搜索功能无法正确匹配。RSS 解析时会自动匹配 feed URL 以 `simonwillison.net/atom` 开头的博客并去除该后缀，无需手动处理。
+
+**标题过滤**：自动跳过标题以小写 `sqlite-utils`、`datasette`、`luau-wasm`、`micropython-wasm`、`llm`、`asyncinject`、`inaturalist-clumper`、`asgi-gzip` 开头的版本发布类文章（大小写敏感）。例如 `datasette 1.0a33` 会被跳过，但 `Datasette Apps: Host custom HTML applications inside Datasette` 不会。

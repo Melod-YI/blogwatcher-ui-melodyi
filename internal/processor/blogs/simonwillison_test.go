@@ -22,6 +22,21 @@ func TestSimonwillisonProcessor_NormalizeArticleURL(t *testing.T) {
 			want:       "https://simonwillison.net/2026/May/18/sighting-362781627",
 		},
 		{
+			name:       "strip atom-notes suffix",
+			articleURL: "https://simonwillison.net/2026/Jun/8/wwdc/#atom-notes",
+			want:       "https://simonwillison.net/2026/Jun/8/wwdc",
+		},
+		{
+			name:       "strip atom-blogmarks suffix",
+			articleURL: "https://simonwillison.net/2026/Jun/11/anthropic-walks-back-policy/#atom-blogmarks",
+			want:       "https://simonwillison.net/2026/Jun/11/anthropic-walks-back-policy",
+		},
+		{
+			name:       "strip hyphenated atom suffix",
+			articleURL: "https://simonwillison.net/2026/Jun/1/post/#atom-my-tag",
+			want:       "https://simonwillison.net/2026/Jun/1/post",
+		},
+		{
 			name:       "no suffix - unchanged",
 			articleURL: "https://simonwillison.net/2026/May/18/another-post",
 			want:       "https://simonwillison.net/2026/May/18/another-post",
@@ -59,12 +74,60 @@ func TestSimonwillisonProcessor_OtherMethods_UseBase(t *testing.T) {
 	}
 }
 
+func TestSimonwillisonProcessor_ShouldSkipArticle(t *testing.T) {
+	p := SimonwillisonProcessor{}
+
+	tests := []struct {
+		name  string
+		title string
+		want  bool
+	}{
+		{"datasette version release", "datasette 1.0a33", true},
+		{"datasette-agent release", "datasette-agent 0.3a0", true},
+		{"datasette-apps release", "datasette-apps 0.1a3", true},
+		{"sqlite-utils release", "sqlite-utils 4.0rc1", true},
+		{"luau-wasm release", "luau-wasm 0.1a0", true},
+		{"micropython-wasm release", "micropython-wasm 0.1a0", true},
+		{"llm release", "llm 0.25a0", true},
+		{"asyncinject release", "asyncinject 0.7a0", true},
+		{"inaturalist-clumper release", "inaturalist-clumper 0.1a0", true},
+		{"asgi-gzip release", "asgi-gzip 0.1a0", true},
+		{"Datasette capitalized - not skipped", "Datasette Apps: Host custom HTML applications inside Datasette", false},
+		{"SQLite capitalized - not skipped", "SQLite: the database is the application", false},
+		{"unrelated title", "Weeknotes: More releases, more museums", false},
+		{"empty title", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := p.ShouldSkipArticle(tt.title)
+			if got != tt.want {
+				t.Errorf("SimonwillisonProcessor.ShouldSkipArticle(%q) = %v, want %v", tt.title, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSimonwillisonProcessor_RegisteredInDefaultRegistry(t *testing.T) {
-	// blogs 包的 init() 会将 simonwillison 处理器注册到 DefaultRegistry
-	p := processor.DefaultRegistry.Get(simonwillisonFeedURL)
-	got := p.NormalizeArticleURL("https://simonwillison.net/2026/May/18/post/#atom-everything")
-	want := "https://simonwillison.net/2026/May/18/post"
-	if got != want {
-		t.Errorf("DefaultRegistry.Get(simonwillisonFeedURL).NormalizeArticleURL() = %s, want %s", got, want)
+	// blogs 包的 init() 会将 simonwillison 处理器注册到 DefaultRegistry（前缀匹配）
+	tests := []struct {
+		name    string
+		feedURL string
+	}{
+		{"atom-everything", "https://simonwillison.net/atom/everything/"},
+		{"atom-notes", "https://simonwillison.net/atom/notes/"},
+		{"atom-links", "https://simonwillison.net/atom/links/"},
+		{"atom without trailing slash", "https://simonwillison.net/atom/everything"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := processor.DefaultRegistry.Get(tt.feedURL)
+			got := p.NormalizeArticleURL("https://simonwillison.net/2026/May/18/post/#atom-everything")
+			want := "https://simonwillison.net/2026/May/18/post"
+			if got != want {
+				t.Errorf("DefaultRegistry.Get(%s).NormalizeArticleURL() = %s, want %s", tt.feedURL, got, want)
+			}
+		})
 	}
 }
