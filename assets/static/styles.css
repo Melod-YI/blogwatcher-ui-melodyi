@@ -333,6 +333,29 @@ p {
   margin-right: 0.5rem;
 }
 
+.article-id {
+  position: relative;
+  z-index: 2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.article-id::before {
+  content: "\00B7";
+  margin-right: 0.5rem;
+}
+
+.article-id:hover {
+  color: var(--accent);
+}
+
+.article-id.copied {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ============================================
    Hamburger Menu - Mobile Toggle
    ============================================ */

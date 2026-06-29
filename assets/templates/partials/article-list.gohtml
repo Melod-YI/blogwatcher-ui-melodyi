@@ -166,6 +166,10 @@
             {{if .PublishedDate}}
             <span class="article-time">{{timeAgo .PublishedDate}}</span>
             {{end}}
+            <span class="article-id"
+                  data-id="{{.ID}}"
+                  title="点击复制文章 ID（用于 CLI）"
+                  onclick="copyArticleId(this, event)">#{{.ID}}</span>
         </div>
     </div>
     <div class="article-actions">
