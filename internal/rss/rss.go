@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -37,7 +38,14 @@ func (e FeedParseError) Error() string {
 }
 
 func ParseFeed(ctx context.Context, feedURL string, proc processor.BlogProcessor) ([]FeedArticle, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
+	// 抓取前按 BLOGWATCHER_FEED_HOSTMAP 改写主机（如 rsshub:1200 -> localhost:19998），
+	// 使 web（容器）与 CLI（宿主）可共用同一份逻辑地址的 feed URL。
+	// 注意：仅改写用于 HTTP 请求的地址，不影响调用方按原始 URL 选择 processor。
+	fetchURL := RewriteFeedURL(feedURL)
+	if fetchURL != feedURL {
+		log.Printf("[RSS] feed URL 主机已重写: %s -> %s", feedURL, fetchURL)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL, nil)
 	if err != nil {
 		return nil, FeedParseError{Message: fmt.Sprintf("failed to build request: %v", err)}
 	}

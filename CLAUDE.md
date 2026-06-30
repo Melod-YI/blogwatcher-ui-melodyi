@@ -72,6 +72,29 @@ blogwatcher article list --blog <name>
 
 ## 特殊处理
 
+### rsshub 本地服务主机映射
+
+部分博客的 feed URL 指向本地部署的 RSSHub，使用 Docker 服务名形式的地址，例如 `http://rsshub:1200/...`。该地址在两个运行时下的可达性不同：
+
+- **Web（Docker 容器内）**：`blogwatcher-ui` 与 `rsshub` 同属一个 compose 网络，可直接通过服务名 `rsshub:1200` 访问，无需额外配置。
+- **CLI（宿主机）**：宿主没有 `rsshub` 这条 DNS，只能经端口映射 `localhost:19998` 访问 RSSHub。
+
+为让两端共用同一份逻辑地址（DB 中统一存 `rsshub:1200` 形式），`rss.ParseFeed` 在 HTTP 抓取前会按环境变量 `BLOGWATCHER_FEED_HOSTMAP` 重写主机。格式：`srchost[:port]=dsthost[:port]`，多条逗号分隔，key 大小写不敏感。value 含端口则使用指定端口，否则保留原端口。
+
+示例（宿主机使用 CLI 时设置）：
+
+```bash
+# bash
+export BLOGWATCHER_FEED_HOSTMAP=rsshub:1200=localhost:19998
+
+# PowerShell
+$env:BLOGWATCHER_FEED_HOSTMAP="rsshub:1200=localhost:19998"
+```
+
+容器侧不设置该变量即保持原样（直接用 `rsshub:1200`）。重写仅作用于 HTTP 抓取地址，不影响 `processor` 注册表按原始域名选择处理器（如 simonwillison.net）。实际发生重写时会输出日志 `[RSS] feed URL 主机已重写: <原> -> <新>`。
+
+注意：走 rsshub 的博客应直接填好 FeedURL，不要依赖 `DiscoverFeedURL` 自动发现——自动发现返回的地址会被写回 DB，重写会导致 `localhost` 形式落库而破坏一致性。
+
 ### simonwillison.net 处理
 
 **URL 清洗**：simonwillison.net 的所有 atom feed（everything、notes、links 等）中的文章链接包含 `/#atom-xxx` 后缀（如 `/#atom-everything`、`/#atom-notes`、`/#atom-blogmarks`），这会导致 HN 搜索功能无法正确匹配。RSS 解析时会自动匹配 feed URL 以 `simonwillison.net/atom` 开头的博客并去除该后缀，无需手动处理。
