@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -107,10 +108,13 @@ func ParseFeed(ctx context.Context, feedURL string, proc processor.BlogProcessor
 			}
 			link = proc.NormalizeArticleURL(link)
 
-			// 从原始 RSS Item 提取 HN 链接
+			// 从原始 RSS Item 提取 HN 链接：优先 <comments>，缺失时回退到 <description>
 			hnURL := ""
 			if rssItem, ok := rssItemMap[link]; ok {
 				hnURL = extractHNURLFromComments(rssItem.Comments)
+				if hnURL == "" {
+					hnURL = extractHNURLFromDescription(rssItem.Description)
+				}
 			}
 
 			thumbnailURL := proc.NormalizeThumbnailURL(thumbnail.ExtractFromRSS(item))
@@ -169,6 +173,23 @@ func extractHNURLFromComments(comments string) string {
 		return comments
 	}
 
+	return ""
+}
+
+// hnDiscussionURLRe 匹配 RSSHub HN 路由在 <description> 中渲染的讨论帖锚点。
+// RSSHub 格式: <a href="https://news.ycombinator.com/item?id=xxx">Comments on Hacker News</a>
+// 仅匹配锚点文本为 "Comments on Hacker News" 的链接，避免误提取正文里偶然出现的 HN 链接。
+var hnDiscussionURLRe = regexp.MustCompile(`href="(https://news\.ycombinator\.com/item\?id=\d+)"[^>]*>Comments on Hacker News<`)
+
+// extractHNURLFromDescription 从 RSS Item 的 Description 字段提取 HN 讨论帖链接。
+// RSSHub 的 HN 路由（如 /hackernews/best、/hackernews/news）不输出 <comments> 元素，
+// 而是把讨论帖地址放在 <description> 的 HTML 锚点里（锚点文本固定为 "Comments on Hacker News"）。
+// gofeed 已对 XML 实体反转义，此处直接在 HTML 文本中匹配该锚点的 href。
+func extractHNURLFromDescription(description string) string {
+	m := hnDiscussionURLRe.FindStringSubmatch(description)
+	if len(m) >= 2 {
+		return m[1]
+	}
 	return ""
 }
 

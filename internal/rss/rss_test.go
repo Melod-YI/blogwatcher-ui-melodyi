@@ -49,3 +49,47 @@ func TestExtractHNURLFromComments(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractHNURLFromDescription(t *testing.T) {
+	tests := []struct {
+		name        string
+		description string
+		want        string
+	}{
+		{
+			name:        "RSSub comments anchor",
+			description: `<a href="https://news.ycombinator.com/item?id=48808482">Comments on Hacker News</a> | <a href="https://openwrt.org/toh/openwrt/one">Source</a>`,
+			want:        "https://news.ycombinator.com/item?id=48808482",
+		},
+		{
+			name:        "RSSub anchor with surrounding whitespace",
+			description: `  <a href="https://news.ycombinator.com/item?id=48823557">Comments on Hacker News</a>  `,
+			want:        "https://news.ycombinator.com/item?id=48823557",
+		},
+		{
+			name:        "HN link in body text - not extracted",
+			description: `<p>See this HN thread: <a href="https://news.ycombinator.com/item?id=12345">a random discussion</a></p>`,
+			want:        "",
+		},
+		{
+			name:        "non-HN comments anchor",
+			description: `<a href="https://example.com/comments">Comments on Hacker News</a>`,
+			want:        "",
+		},
+		{
+			name:        "empty description",
+			description: ``,
+			want:        "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractHNURLFromDescription(tt.description)
+			if got != tt.want {
+				t.Errorf("extractHNURLFromDescription(%s) = %s, want %s",
+					tt.description, got, tt.want)
+			}
+		})
+	}
+}
