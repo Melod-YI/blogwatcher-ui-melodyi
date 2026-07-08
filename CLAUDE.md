@@ -99,4 +99,13 @@ $env:BLOGWATCHER_FEED_HOSTMAP="rsshub:1200=localhost:19998"
 
 **URL 清洗**：simonwillison.net 的所有 atom feed（everything、notes、links 等）中的文章链接包含 `/#atom-xxx` 后缀（如 `/#atom-everything`、`/#atom-notes`、`/#atom-blogmarks`），这会导致 HN 搜索功能无法正确匹配。RSS 解析时会自动匹配 feed URL 以 `simonwillison.net/atom` 开头的博客并去除该后缀，无需手动处理。
 
-**标题过滤**：自动跳过标题以小写 `sqlite-utils`、`datasette`、`luau-wasm`、`micropython-wasm`、`llm`、`asyncinject`、`inaturalist-clumper`、`asgi-gzip` 开头的版本发布类文章（大小写敏感）。例如 `datasette 1.0a33` 会被跳过，但 `Datasette Apps: Host custom HTML applications inside Datasette` 不会。
+**标题过滤**：自动跳过标题以小写 `sqlite-utils`、`sqlite-migrate`、`datasette`、`luau-wasm`、`micropython-wasm`、`llm`、`asyncinject`、`inaturalist-clumper`、`asgi-gzip` 开头的版本发布类文章（大小写敏感）。例如 `datasette 1.0a33` 会被跳过，但 `Datasette Apps: Host custom HTML applications inside Datasette` 不会。
+
+### Hacker News 讨论帖地址提取
+
+RSS 解析时会尝试为每篇文章提取 HN 讨论帖地址并直接写入 `hn_url`（状态记为 `found_exact`），避免依赖后续 Algolia 兜底搜索。提取顺序：
+
+1. RSS `<comments>` 元素：若其值为 `https://news.ycombinator.com/item?id=...` 则直接采用。HN 官方 feed（`https://news.ycombinator.com/rss`）走此路径。
+2. RSS `<description>` 回退：RSSHub 的 HN 路由（`/hackernews/best`、`/hackernews/news` 等）不输出 `<comments>` 元素，而是把讨论帖地址放在 `<description>` 的 HTML 锚点里（锚点文本固定为 `Comments on Hacker News`）。解析器在 `<comments>` 缺失时匹配该锚点的 `href` 提取。仅匹配该特定锚点文本，避免误提取正文中偶然出现的 HN 链接。
+
+注意：Atom / JSON feed 无 `<comments>`/`<description>` 提取逻辑，仍依赖 Algolia 兜底搜索。

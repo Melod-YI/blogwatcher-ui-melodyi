@@ -86,6 +86,7 @@ func TestSimonwillisonProcessor_ShouldSkipArticle(t *testing.T) {
 		{"datasette-agent release", "datasette-agent 0.3a0", true},
 		{"datasette-apps release", "datasette-apps 0.1a3", true},
 		{"sqlite-utils release", "sqlite-utils 4.0rc1", true},
+		{"sqlite-migrate release", "sqlite-migrate 0.1a0", true},
 		{"luau-wasm release", "luau-wasm 0.1a0", true},
 		{"micropython-wasm release", "micropython-wasm 0.1a0", true},
 		{"llm release", "llm 0.25a0", true},

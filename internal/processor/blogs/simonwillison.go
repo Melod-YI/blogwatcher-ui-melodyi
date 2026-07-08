@@ -19,6 +19,7 @@ var atomSuffixRe = regexp.MustCompile(`/#[aA]tom-[\w-]+$`)
 // skipTitlePrefixes 是需要过滤的版本发布类文章标题前缀（大小写敏感）
 var skipTitlePrefixes = []string{
 	"sqlite-utils",
+	"sqlite-migrate",
 	"datasette",
 	"luau-wasm",
 	"micropython-wasm",
