@@ -904,3 +904,59 @@ func TestFavoriteArticleSetsFavoritedAt(t *testing.T) {
 		t.Fatal("expected is_favorited=false after unfavorite")
 	}
 }
+
+func TestMarkArticleReadSetsReadAt(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+	if _, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A", URL: "https://example.com/a", HNStatus: model.HNStatusNotSearch},
+	}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	all, _ := db.ListArticles(false, nil)
+	id := all[0].ID
+
+	if _, err := db.MarkArticleRead(id); err != nil {
+		t.Fatalf("mark read: %v", err)
+	}
+	a, _ := db.GetArticleByID(id)
+	if a.ReadAt == nil {
+		t.Fatal("expected read_at set after mark read")
+	}
+
+	if _, err := db.MarkArticleUnread(id); err != nil {
+		t.Fatalf("mark unread: %v", err)
+	}
+	a, _ = db.GetArticleByID(id)
+	if a.ReadAt != nil {
+		t.Fatalf("expected read_at nil after unread, got %v", a.ReadAt)
+	}
+	if a.IsRead {
+		t.Fatal("expected is_read=false after unread")
+	}
+}
+
+func TestMarkAllUnreadArticlesReadSetsReadAt(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+	if _, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A", URL: "https://example.com/a", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "B", URL: "https://example.com/b", HNStatus: model.HNStatusNotSearch},
+	}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+
+	if err := db.MarkAllUnreadArticlesRead(nil); err != nil {
+		t.Fatalf("mark all: %v", err)
+	}
+	all, _ := db.ListArticlesByReadStatus(true, nil)
+	for _, a := range all {
+		if a.ReadAt == nil {
+			t.Errorf("article %d: expected read_at set", a.ID)
+		}
+	}
+}

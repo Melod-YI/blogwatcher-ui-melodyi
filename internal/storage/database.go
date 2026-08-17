@@ -774,7 +774,9 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 }
 
 func (db *Database) MarkArticleRead(id int64) (bool, error) {
-	result, err := db.conn.Exec(`UPDATE articles SET is_read = 1 WHERE id = ?`, id)
+	now := time.Now().Format(sqliteTimeLayout)
+	log.Printf("[Storage] MarkArticleRead: id=%d time=%s", id, now)
+	result, err := db.conn.Exec(`UPDATE articles SET is_read = 1, read_at = ? WHERE id = ?`, now, id)
 	if err != nil {
 		return false, err
 	}
@@ -786,7 +788,8 @@ func (db *Database) MarkArticleRead(id int64) (bool, error) {
 }
 
 func (db *Database) MarkArticleUnread(id int64) (bool, error) {
-	result, err := db.conn.Exec(`UPDATE articles SET is_read = 0 WHERE id = ?`, id)
+	log.Printf("[Storage] MarkArticleUnread: id=%d", id)
+	result, err := db.conn.Exec(`UPDATE articles SET is_read = 0, read_at = NULL WHERE id = ?`, id)
 	if err != nil {
 		return false, err
 	}
@@ -854,8 +857,11 @@ func (db *Database) UnfavoriteArticle(id int64) error {
 // MarkAllUnreadArticlesRead marks all unread articles as read.
 // If blogID is provided, only marks articles from that blog.
 func (db *Database) MarkAllUnreadArticlesRead(blogID *int64) error {
-	query := `UPDATE articles SET is_read = 1 WHERE is_read = 0`
+	now := time.Now().Format(sqliteTimeLayout)
+	log.Printf("[Storage] MarkAllUnreadArticlesRead: blog=%v time=%s", blogID, now)
+	query := `UPDATE articles SET is_read = 1, read_at = ? WHERE is_read = 0`
 	var args []interface{}
+	args = append(args, now)
 
 	if blogID != nil {
 		query += " AND blog_id = ?"
