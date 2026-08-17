@@ -36,9 +36,16 @@ type SimonwillisonProcessor struct {
 	processor.BaseProcessor
 }
 
-// NormalizeArticleURL 去除 simonwillison 文章 URL 中的 /#atom-xxx 后缀
+// NormalizeArticleURL 去除 simonwillison 文章 URL 中的 /#atom-xxx 后缀，并统一去除末尾斜杠。
+//
+// 旧 atom feed 的文章链接形如 .../slug/#atom-everything，正则会连同前导 / 一起剥离片段，
+// 结果自然无尾斜杠；新 feed 已改为纯 permalink .../slug/（无 #atom 片段、以尾斜杠结尾），
+// 正则不再命中。若不额外统一尾斜杠，同一篇文章在 feed 格式变更前后会以
+// “不带/带尾斜杠”两种 URL 入库（articles.url 有 UNIQUE 但二者不同），造成重复。
+// 故无论是否命中片段，最终都 TrimRight 掉末尾斜杠，归一为无斜杠的规范 URL。
 func (SimonwillisonProcessor) NormalizeArticleURL(articleURL string) string {
-	return atomSuffixRe.ReplaceAllString(articleURL, "")
+	cleaned := atomSuffixRe.ReplaceAllString(articleURL, "")
+	return strings.TrimRight(cleaned, "/")
 }
 
 // ShouldSkipArticle 跳过标题以特定项目名开头的版本发布类文章（大小写敏感）

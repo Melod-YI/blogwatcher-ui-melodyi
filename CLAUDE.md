@@ -99,6 +99,8 @@ $env:BLOGWATCHER_FEED_HOSTMAP="rsshub:1200=localhost:19998"
 
 **URL 清洗**：simonwillison.net 的所有 atom feed（everything、notes、links 等）中的文章链接包含 `/#atom-xxx` 后缀（如 `/#atom-everything`、`/#atom-notes`、`/#atom-blogmarks`），这会导致 HN 搜索功能无法正确匹配。RSS 解析时会自动匹配 feed URL 以 `simonwillison.net/atom` 开头的博客并去除该后缀，无需手动处理。
 
+注意：清洗还会统一去除 URL 末尾斜杠。Simon 曾调整过 atom feed 格式：旧版链接带 `/#atom-xxx` 片段（剥离片段后自然无尾斜杠），新版改为纯 permalink `.../slug/`（无片段、带尾斜杠）。若不统一尾斜杠，同一篇文章在 feed 格式变更前后会以“不带/带尾斜杠”两种 URL 入库（`articles.url` 虽有 UNIQUE 但二者不同），造成重复。故无论是否命中片段，`NormalizeArticleURL` 最终都 `TrimRight` 掉末尾斜杠，归一为无斜杠的规范 URL。
+
 **标题过滤**：自动跳过标题以小写 `sqlite-utils`、`sqlite-migrate`、`datasette`、`luau-wasm`、`micropython-wasm`、`llm`、`asyncinject`、`inaturalist-clumper`、`asgi-gzip` 开头的版本发布类文章（大小写敏感）。例如 `datasette 1.0a33` 会被跳过，但 `Datasette Apps: Host custom HTML applications inside Datasette` 不会。
 
 ### Hacker News 讨论帖地址提取

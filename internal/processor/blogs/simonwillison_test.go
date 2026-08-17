@@ -42,6 +42,14 @@ func TestSimonwillisonProcessor_NormalizeArticleURL(t *testing.T) {
 			want:       "https://simonwillison.net/2026/May/18/another-post",
 		},
 		{
+			// 新 feed 格式：链接已无 #atom 片段，但以尾斜杠结尾。
+			// 必须与旧格式（#atom 片段被剥离后无尾斜杠）归一为同一 URL，
+			// 否则 feed 格式变更前后同一篇文章会以带/不带尾斜杠两种 URL 重复入库。
+			name:       "no suffix but trailing slash - stripped to canonical",
+			articleURL: "https://simonwillison.net/2026/Aug/8/john-gruber/",
+			want:       "https://simonwillison.net/2026/Aug/8/john-gruber",
+		},
+		{
 			name:       "empty URL",
 			articleURL: "",
 			want:       "",
