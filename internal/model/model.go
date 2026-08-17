@@ -30,10 +30,12 @@ type Article struct {
 	PublishedDate  *time.Time
 	DiscoveredDate *time.Time
 	IsRead         bool
-	HasNote        bool // 文章备注状态
-	IsFavorited    bool // 文章收藏状态
-	HNURL          string   // Hacker News 讨论链接
-	HNStatus       HNStatus // HN 链接搜索状态
+	HasNote        bool       // 文章备注状态
+	IsFavorited    bool       // 文章收藏状态
+	FavoritedAt    *time.Time // 收藏时间，未收藏为 nil
+	ReadAt         *time.Time // 已读时间，未读为 nil
+	HNURL          string     // Hacker News 讨论链接
+	HNStatus       HNStatus   // HN 链接搜索状态
 }
 
 // ArticleWithBlog extends Article with blog metadata for display in article cards.
@@ -49,10 +51,12 @@ type ArticleWithBlog struct {
 	IsRead         bool
 	BlogName       string
 	BlogURL        string
-	HasNote        bool // 文章备注状态
-	IsFavorited    bool // 文章收藏状态
-	HNURL          string   // Hacker News 讨论链接
-	HNStatus       HNStatus // HN 链接搜索状态
+	HasNote        bool       // 文章备注状态
+	IsFavorited    bool       // 文章收藏状态
+	FavoritedAt    *time.Time // 收藏时间，未收藏为 nil
+	ReadAt         *time.Time // 已读时间，未读为 nil
+	HNURL          string     // Hacker News 讨论链接
+	HNStatus       HNStatus   // HN 链接搜索状态
 }
 
 // SearchOptions contains all filter parameters for article search.
@@ -66,6 +70,7 @@ type SearchOptions struct {
 	DateTo      *time.Time // nil = no upper bound
 	Limit       int        // 0 = use default (20)
 	Offset      int        // 0 = start from beginning
+	Sort        string     // "published"(默认) | "favorited" | "read"
 }
 
 // DefaultPageSize is the default number of articles per page.
@@ -80,4 +85,11 @@ const (
 	HNStatusFuzzy     HNStatus = "found_fuzzy"  // 模糊匹配
 	HNStatusNotFound  HNStatus = "not_found"    // 搜索无结果
 	HNStatusFailed    HNStatus = "failed"       // 搜索失败
+)
+
+// Sort 取值常量
+const (
+	SortPublished = "published"
+	SortFavorited = "favorited"
+	SortRead      = "read"
 )
