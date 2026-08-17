@@ -374,6 +374,11 @@ func (s *Server) renderUpdatedArticleCard(w http.ResponseWriter, id int64) {
 		BlogURL:        blog.URL,
 	}
 
+	// 装配标签用于卡片 chips 渲染
+	if tags, err := s.db.GetArticleTags(id); err == nil {
+		articleWithBlog.Tags = tags
+	}
+
 	data := map[string]interface{}{
 		"Articles":       []model.ArticleWithBlog{articleWithBlog},
 		"DisplayedCount": 0,
@@ -607,6 +612,9 @@ func parseSearchOptions(r *http.Request) (model.SearchOptions, string, int64) {
 		opts.IsFavorited = &isFav
 		// Don't set IsRead filter — show both read and unread favorited articles
 		opts.IsRead = nil
+	case "tag":
+		opts.TagName = r.URL.Query().Get("tag")
+		opts.IsRead = nil // 标签筛选不强制已读状态
 	default:
 		isRead := false
 		opts.IsRead = &isRead

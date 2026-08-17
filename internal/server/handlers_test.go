@@ -520,3 +520,18 @@ func createTestServer(t *testing.T) http.Handler {
 
 	return srv
 }
+
+func TestParseSearchOptions_TagFilter(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/articles?filter=tag&tag=Go", nil)
+	opts, filter, _ := parseSearchOptions(req)
+	if filter != "tag" {
+		t.Fatalf("filter = %q, want 'tag'", filter)
+	}
+	if opts.TagName != "Go" {
+		t.Fatalf("TagName = %q, want 'Go'", opts.TagName)
+	}
+	// tag 筛选不应强制 IsRead
+	if opts.IsRead != nil {
+		t.Fatalf("IsRead should be nil for tag filter, got %v", *opts.IsRead)
+	}
+}
