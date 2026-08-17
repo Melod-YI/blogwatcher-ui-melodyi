@@ -782,3 +782,28 @@ func TestSearchArticlesWithFavoriteFilter(t *testing.T) {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
 }
+
+func TestMigrationsAddFavoritedAtAndReadAt(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "blogwatcher.db")
+
+	db, err := OpenDatabase(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.Close()
+
+	// Re-open: idempotent, must not error on already-existing columns
+	db, err = OpenDatabase(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+
+	if !db.columnExists("articles", "favorited_at") {
+		t.Fatal("expected favorited_at column to exist")
+	}
+	if !db.columnExists("articles", "read_at") {
+		t.Fatal("expected read_at column to exist")
+	}
+}

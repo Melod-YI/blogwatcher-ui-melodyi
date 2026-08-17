@@ -209,6 +209,20 @@ func (db *Database) ensureMigrations() error {
 		}
 	}
 
+	// Add favorited_at column if it doesn't exist
+	if !db.columnExists("articles", "favorited_at") {
+		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN favorited_at TIMESTAMP`); err != nil {
+			return fmt.Errorf("failed to add favorited_at column: %w", err)
+		}
+	}
+
+	// Add read_at column if it doesn't exist
+	if !db.columnExists("articles", "read_at") {
+		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN read_at TIMESTAMP`); err != nil {
+			return fmt.Errorf("failed to add read_at column: %w", err)
+		}
+	}
+
 	return nil
 }
 
