@@ -1719,6 +1719,103 @@ func (db *Database) DeleteTag(id int64) (int64, error) {
 	return affected, nil
 }
 
+// AddArticleTag 给文章加标签，幂等（INSERT OR IGNORE）。
+func (db *Database) AddArticleTag(articleID, tagID int64) error {
+	_, err := db.conn.Exec(`INSERT OR IGNORE INTO article_tags (tag_id, article_id) VALUES (?, ?)`, tagID, articleID)
+	return err
+}
+
+// RemoveArticleTag 移除文章标签关联，无影响行也算成功。
+func (db *Database) RemoveArticleTag(articleID, tagID int64) error {
+	_, err := db.conn.Exec(`DELETE FROM article_tags WHERE tag_id = ? AND article_id = ?`, tagID, articleID)
+	return err
+}
+
+// SetArticleTags 全量替换文章标签：事务内删旧关联、插新关联。
+func (db *Database) SetArticleTags(articleID int64, tagIDs []int64) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM article_tags WHERE article_id = ?`, articleID); err != nil {
+		return fmt.Errorf("failed to clear article tags: %w", err)
+	}
+	for _, tid := range tagIDs {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO article_tags (tag_id, article_id) VALUES (?, ?)`, tid, articleID); err != nil {
+			return fmt.Errorf("failed to insert article tag: %w", err)
+		}
+	}
+	return tx.Commit()
+}
+
+// GetArticleTags 取单篇文章的所有标签。
+func (db *Database) GetArticleTags(articleID int64) ([]model.Tag, error) {
+	rows, err := db.conn.Query(`SELECT t.id, t.name, t.created_at FROM tags t
+		INNER JOIN article_tags at ON at.tag_id = t.id
+		WHERE at.article_id = ? ORDER BY t.name`, articleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []model.Tag
+	for rows.Next() {
+		var tag model.Tag
+		var created sql.NullString
+		if err := rows.Scan(&tag.ID, &tag.Name, &created); err != nil {
+			return nil, err
+		}
+		if created.Valid {
+			if parsed, err := parseTime(created.String); err == nil {
+				tag.CreatedAt = parsed
+			}
+		}
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
+// GetTagsForArticles 批量取多文章的标签，按 article_id 聚合，避免列表渲染 N+1。
+// 返回 map[articleID][]Tag。空入参返回空 map。
+func (db *Database) GetTagsForArticles(articleIDs []int64) (map[int64][]model.Tag, error) {
+	result := map[int64][]model.Tag{}
+	if len(articleIDs) == 0 {
+		return result, nil
+	}
+	placeholders := make([]string, len(articleIDs))
+	args := make([]interface{}, len(articleIDs))
+	for i, id := range articleIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	query := fmt.Sprintf(`SELECT at.article_id, t.id, t.name, t.created_at FROM tags t
+		INNER JOIN article_tags at ON at.tag_id = t.id
+		WHERE at.article_id IN (%s) ORDER BY t.name`, strings.Join(placeholders, ","))
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var articleID int64
+		var tag model.Tag
+		var created sql.NullString
+		if err := rows.Scan(&articleID, &tag.ID, &tag.Name, &created); err != nil {
+			return nil, err
+		}
+		if created.Valid {
+			if parsed, err := parseTime(created.String); err == nil {
+				tag.CreatedAt = parsed
+			}
+		}
+		result[articleID] = append(result[articleID], tag)
+	}
+	return result, rows.Err()
+}
+
 // ListCategoriesWithBlogCount returns all categories with their blog counts.
 // Uses LEFT JOIN to include categories with zero blogs.
 // Categories are ordered by name alphabetically.

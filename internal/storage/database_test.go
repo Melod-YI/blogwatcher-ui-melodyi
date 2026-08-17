@@ -912,3 +912,155 @@ func TestDeleteTag(t *testing.T) {
 		t.Fatal("expected error deleting missing tag")
 	}
 }
+
+func TestAddArticleTag_Idempotent(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{{BlogID: blog.ID, Title: "A", URL: "https://example.com/idem", HNStatus: model.HNStatusNotSearch}})
+	arts, _ := db.ListArticles(false, nil)
+	articleID := arts[0].ID
+	tag, _ := db.CreateTag("Go")
+
+	if err := db.AddArticleTag(articleID, tag.ID); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if err := db.AddArticleTag(articleID, tag.ID); err != nil {
+		t.Fatalf("add duplicate: %v", err)
+	}
+	tags, _ := db.GetArticleTags(articleID)
+	if len(tags) != 1 {
+		t.Fatalf("expected 1 tag after idempotent add, got %d", len(tags))
+	}
+}
+
+func TestRemoveArticleTag(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{{BlogID: blog.ID, Title: "A", URL: "https://example.com/rm", HNStatus: model.HNStatusNotSearch}})
+	arts, _ := db.ListArticles(false, nil)
+	articleID := arts[0].ID
+	tag, _ := db.CreateTag("Go")
+	db.AddArticleTag(articleID, tag.ID)
+
+	if err := db.RemoveArticleTag(articleID, tag.ID); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	tags, _ := db.GetArticleTags(articleID)
+	if len(tags) != 0 {
+		t.Fatalf("expected 0 tags after remove, got %d", len(tags))
+	}
+	if err := db.RemoveArticleTag(articleID, tag.ID); err != nil {
+		t.Fatalf("remove absent: %v", err)
+	}
+}
+
+func TestSetArticleTags_FullReplace(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{{BlogID: blog.ID, Title: "A", URL: "https://example.com/set", HNStatus: model.HNStatusNotSearch}})
+	arts, _ := db.ListArticles(false, nil)
+	articleID := arts[0].ID
+	t1, _ := db.CreateTag("a")
+	t2, _ := db.CreateTag("b")
+	t3, _ := db.CreateTag("c")
+
+	if err := db.SetArticleTags(articleID, []int64{t1.ID, t2.ID}); err != nil {
+		t.Fatalf("set1: %v", err)
+	}
+	tags, _ := db.GetArticleTags(articleID)
+	if len(tags) != 2 {
+		t.Fatalf("expected 2 tags, got %d", len(tags))
+	}
+	if err := db.SetArticleTags(articleID, []int64{t2.ID, t3.ID}); err != nil {
+		t.Fatalf("set2: %v", err)
+	}
+	names := map[string]bool{}
+	for _, tg := range mustGetArticleTags(t, db, articleID) {
+		names[tg.Name] = true
+	}
+	if !names["b"] || !names["c"] || names["a"] {
+		t.Fatalf("unexpected tags after replace: %+v", names)
+	}
+	if err := db.SetArticleTags(articleID, nil); err != nil {
+		t.Fatalf("set3: %v", err)
+	}
+	if tags, _ := db.GetArticleTags(articleID); len(tags) != 0 {
+		t.Fatalf("expected 0 after clear, got %d", len(tags))
+	}
+}
+
+func TestGetTagsForArticles_Batch(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A1", URL: "https://example.com/b1", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "A2", URL: "https://example.com/b2", HNStatus: model.HNStatusNotSearch},
+	})
+	arts, _ := db.ListArticles(false, nil)
+	id1, id2 := arts[0].ID, arts[1].ID
+	t1, _ := db.CreateTag("Go")
+	t2, _ := db.CreateTag("DB")
+	db.AddArticleTag(id1, t1.ID)
+	db.AddArticleTag(id2, t2.ID)
+	db.AddArticleTag(id2, t1.ID)
+
+	m, err := db.GetTagsForArticles([]int64{id1, id2})
+	if err != nil {
+		t.Fatalf("batch: %v", err)
+	}
+	if len(m[id1]) != 1 || m[id1][0].Name != "Go" {
+		t.Fatalf("id1 tags wrong: %+v", m[id1])
+	}
+	if len(m[id2]) != 2 {
+		t.Fatalf("id2 expected 2 tags, got %d", len(m[id2]))
+	}
+}
+
+func TestDeleteTag_CascadesAssociations(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{{BlogID: blog.ID, Title: "A", URL: "https://example.com/ca", HNStatus: model.HNStatusNotSearch}})
+	arts, _ := db.ListArticles(false, nil)
+	articleID := arts[0].ID
+
+	tag, _ := db.CreateTag("tmp")
+	db.AddArticleTag(articleID, tag.ID)
+
+	tags, _ := db.GetArticleTags(articleID)
+	if len(tags) != 1 {
+		t.Fatalf("expected 1 tag before delete, got %d", len(tags))
+	}
+
+	affected, err := db.DeleteTag(tag.ID)
+	if err != nil || affected == 0 {
+		t.Fatalf("delete tag: affected=%d err=%v", affected, err)
+	}
+
+	tags, _ = db.GetArticleTags(articleID)
+	if len(tags) != 0 {
+		t.Fatalf("expected 0 tags after delete, got %d", len(tags))
+	}
+	if art, _ := db.GetArticleByID(articleID); art == nil {
+		t.Fatal("article should still exist after tag deletion")
+	}
+}
+
+// mustGetArticleTags 测试辅助：断言获取成功并返回标签。
+func mustGetArticleTags(t *testing.T, db *Database, articleID int64) []model.Tag {
+	t.Helper()
+	tags, err := db.GetArticleTags(articleID)
+	if err != nil {
+		t.Fatalf("get tags: %v", err)
+	}
+	return tags
+}
