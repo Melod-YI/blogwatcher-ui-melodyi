@@ -546,6 +546,9 @@ func TestHandleTagCreate(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create: status=%d body=%s", rec.Code, rec.Body.String())
 	}
+	if got := rec.Header().Get("HX-Trigger"); got != "articleListUpdated" {
+		t.Fatalf("HX-Trigger = %q, want articleListUpdated", got)
+	}
 	db := srv.(*Server).db
 	tag, err := db.GetTagByName("Go")
 	if err != nil || tag == nil {
@@ -563,6 +566,9 @@ func TestHandleTagRename(t *testing.T) {
 	srv.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("rename: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("HX-Trigger"); got != "articleListUpdated" {
+		t.Fatalf("HX-Trigger = %q, want articleListUpdated", got)
 	}
 	got, _ := db.GetTagByID(tag.ID)
 	if got.Name != "new" {
@@ -593,6 +599,9 @@ func TestHandleTagDelete(t *testing.T) {
 	srv.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("delete: status=%d", rec.Code)
+	}
+	if got := rec.Header().Get("HX-Trigger"); got != "articleListUpdated" {
+		t.Fatalf("HX-Trigger = %q, want articleListUpdated", got)
 	}
 	if got, _ := db.GetTagByID(tag.ID); got != nil {
 		t.Fatal("tag should be deleted")

@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/processor"
@@ -1420,6 +1421,18 @@ func (s *Server) handleTagsPage(w http.ResponseWriter, r *http.Request) {
 	s.renderTemplate(w, "tags.gohtml", data)
 }
 
+// renderTagsContent 渲染 .tags-content 片段，供 create/rename/delete 成功后返回。
+// 形状与模板里 hx-target=".tags-content" hx-swap="innerHTML" 匹配，避免整页注入子区。
+func (s *Server) renderTagsContent(w http.ResponseWriter) {
+	tags, err := s.db.ListTags()
+	if err != nil {
+		log.Printf("Error listing tags for partial: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	s.renderTemplate(w, "tags-content.gohtml", map[string]interface{}{"Tags": tags})
+}
+
 // handleTagsListPartial 渲染标签列表片段（侧边栏 Tags 分区 / 工具栏下拉用，HTMX）。
 func (s *Server) handleTagsListPartial(w http.ResponseWriter, r *http.Request) {
 	tags, err := s.db.ListTags()
@@ -1438,7 +1451,7 @@ func (s *Server) handleTagsListPartial(w http.ResponseWriter, r *http.Request) {
 // handleTagCreate 创建标签并重渲染管理页。
 func (s *Server) handleTagCreate(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
-	if name == "" || len(name) > 50 {
+	if name == "" || utf8.RuneCountInString(name) > 50 {
 		http.Error(w, "Invalid tag name", http.StatusBadRequest)
 		return
 	}
@@ -1449,7 +1462,7 @@ func (s *Server) handleTagCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Created tag '%s'", name)
 	w.Header().Set("HX-Trigger", "articleListUpdated")
-	s.handleTagsPage(w, r)
+	s.renderTagsContent(w)
 }
 
 // handleTagRename 重命名标签。
@@ -1460,7 +1473,7 @@ func (s *Server) handleTagRename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimSpace(r.FormValue("name"))
-	if name == "" || len(name) > 50 {
+	if name == "" || utf8.RuneCountInString(name) > 50 {
 		http.Error(w, "Invalid tag name", http.StatusBadRequest)
 		return
 	}
@@ -1479,7 +1492,7 @@ func (s *Server) handleTagRename(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Renamed tag %d to '%s'", id, name)
 	w.Header().Set("HX-Trigger", "articleListUpdated")
-	s.handleTagsPage(w, r)
+	s.renderTagsContent(w)
 }
 
 // handleTagDelete 删除标签（级联解除关联）。
@@ -1500,5 +1513,5 @@ func (s *Server) handleTagDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Deleted tag %d", id)
 	w.Header().Set("HX-Trigger", "articleListUpdated")
-	s.handleTagsPage(w, r)
+	s.renderTagsContent(w)
 }
