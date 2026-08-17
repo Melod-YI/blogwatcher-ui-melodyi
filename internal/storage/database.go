@@ -818,7 +818,7 @@ func (db *Database) UpdateArticleHasNote(id int64, hasNote bool) error {
 // Returns error if the article does not exist.
 func (db *Database) FavoriteArticle(id int64) error {
 	now := time.Now().Format(sqliteTimeLayout)
-	log.Printf("[storage] FavoriteArticle: id=%d time=%s", id, now)
+	log.Printf("[Storage] FavoriteArticle: id=%d time=%s", id, now)
 	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 1, favorited_at = ? WHERE id = ?`, now, id)
 	if err != nil {
 		return fmt.Errorf("failed to favorite article: %w", err)
@@ -836,7 +836,7 @@ func (db *Database) FavoriteArticle(id int64) error {
 // UnfavoriteArticle removes the favorite mark from an article.
 // Returns error if the article does not exist.
 func (db *Database) UnfavoriteArticle(id int64) error {
-	log.Printf("[storage] UnfavoriteArticle: id=%d", id)
+	log.Printf("[Storage] UnfavoriteArticle: id=%d", id)
 	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 0, favorited_at = NULL WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("failed to unfavorite article: %w", err)
