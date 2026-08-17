@@ -663,6 +663,9 @@ func TestHandleArticleTagRemove(t *testing.T) {
 	if len(tags) != 0 {
 		t.Fatalf("expected 0 tags, got %d", len(tags))
 	}
+	if rec.Header().Get("HX-Trigger") == "" {
+		t.Fatal("expected HX-Trigger set")
+	}
 }
 
 func TestHandleArticleTags_NonExistentArticle(t *testing.T) {
@@ -696,5 +699,8 @@ func TestHandleArticleTagSave(t *testing.T) {
 	tags, _ := db.GetArticleTags(id)
 	if len(tags) != 2 {
 		t.Fatalf("expected 2 tags, got %d", len(tags))
+	}
+	if rec.Header().Get("HX-Trigger") == "" {
+		t.Fatal("expected HX-Trigger set")
 	}
 }

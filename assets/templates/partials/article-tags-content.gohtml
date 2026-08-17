@@ -1,7 +1,8 @@
 {{define "article-tags-content.gohtml"}}
-<form hx-post="/articles/{{.ID}}/tags/save"
-      hx-target=".article-tags-content"
-      hx-swap="innerHTML">
+<form id="article-tags-form-{{.ID}}"
+      hx-post="/articles/{{.ID}}/tags/save"
+      hx-target="#article-tags-form-{{.ID}}"
+      hx-swap="outerHTML">
     <div class="article-tags-content tag-chips-selectable">
         {{range .AllTags}}
         <label class="tag-chip-selectable{{if index $.CurrentIDs .ID}} active{{end}}">
