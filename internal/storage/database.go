@@ -209,6 +209,29 @@ func (db *Database) ensureMigrations() error {
 		}
 	}
 
+	// Create tags table if it doesn't exist
+	if !db.tableExists("tags") {
+		if _, err := db.conn.Exec(`CREATE TABLE IF NOT EXISTS tags (
+			id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`); err != nil {
+			return fmt.Errorf("failed to create tags table: %w", err)
+		}
+	}
+
+	// Create article_tags join table if it doesn't exist
+	if !db.tableExists("article_tags") {
+		if _, err := db.conn.Exec(`CREATE TABLE IF NOT EXISTS article_tags (
+			tag_id INTEGER NOT NULL,
+			article_id INTEGER NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (tag_id, article_id)
+		)`); err != nil {
+			return fmt.Errorf("failed to create article_tags table: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -1450,6 +1473,7 @@ type ListFilterOptions struct {
 	AfterDate    *time.Time // 日期筛选（nil 表示无限制）
 	Limit        int        // 结果数量限制（0 表示无限制）
 	Offset       int        // 结果偏移量（用于翻页）
+	TagName      string     // 标签名称筛选（空表示不按标签筛选）
 }
 
 // ListArticlesWithFilters 根据筛选选项列出文章（带博客信息）

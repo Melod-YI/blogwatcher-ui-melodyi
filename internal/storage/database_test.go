@@ -782,3 +782,14 @@ func TestSearchArticlesWithFavoriteFilter(t *testing.T) {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
 }
+
+func TestTagsTablesMigration(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	for _, tbl := range []string{"tags", "article_tags"} {
+		if !db.tableExists(tbl) {
+			t.Fatalf("expected table %s to exist after migration", tbl)
+		}
+	}
+}
