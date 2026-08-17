@@ -704,3 +704,62 @@ func TestHandleArticleTagSave(t *testing.T) {
 		t.Fatal("expected HX-Trigger set")
 	}
 }
+
+func TestParseSearchOptionsSortDefaults(t *testing.T) {
+	cases := []struct {
+		query string
+		want  string
+	}{
+		{"/articles?filter=favorites", model.SortFavorited},
+		{"/articles?filter=read", model.SortRead},
+		{"/articles", model.SortPublished},
+		{"/articles?filter=unread", model.SortPublished},
+		// 显式 sort 覆盖默认
+		{"/articles?filter=favorites&sort=published", model.SortPublished},
+		{"/articles?filter=read&sort=favorited", model.SortFavorited},
+		// 未知 sort 值回退到 filter 默认
+		{"/articles?filter=favorites&sort=bogus", model.SortFavorited},
+		{"/articles?sort=bogus", model.SortPublished},
+	}
+	for _, c := range cases {
+		req := httptest.NewRequest(http.MethodGet, c.query, nil)
+		opts, _, _ := parseSearchOptions(req)
+		if opts.Sort != c.want {
+			t.Errorf("query=%s: Sort=%q want %q", c.query, opts.Sort, c.want)
+		}
+	}
+}
+
+func TestArticleListRendersSortControlOnFavorites(t *testing.T) {
+	srv := createTestServer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/articles?filter=favorites", nil)
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="sort-favorited"`) {
+		t.Error("favorites page should render sort-favorited radio")
+	}
+	if !strings.Contains(body, `id="sort-published"`) {
+		t.Error("favorites page should render sort-published radio")
+	}
+	if !strings.Contains(body, `name="sort" id="sort-hidden"`) {
+		t.Error("page should render hidden sort input")
+	}
+}
+
+func TestArticleListNoSortControlOnInbox(t *testing.T) {
+	srv := createTestServer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/articles?filter=unread", nil)
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if strings.Contains(body, `class="sort-toggle"`) {
+		t.Error("inbox page should not render sort control")
+	}
+}

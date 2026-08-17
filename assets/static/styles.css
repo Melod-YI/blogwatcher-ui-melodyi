@@ -961,6 +961,52 @@ p {
 }
 
 /* ============================================
+   Sort Toggle (favorites / read pages)
+   ============================================ */
+.sort-toggle {
+  display: inline-flex;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.sort-toggle input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.sort-toggle label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  color: var(--text-secondary);
+}
+
+.sort-toggle label:hover {
+  background-color: var(--bg-elevated);
+}
+
+.sort-toggle input[type="radio"]:checked + label {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.sort-toggle input[type="radio"]:focus-visible + label {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ============================================
    Header Toggles Container
    ============================================ */
 .header-toggles {

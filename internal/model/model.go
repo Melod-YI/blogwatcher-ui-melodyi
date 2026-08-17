@@ -30,10 +30,12 @@ type Article struct {
 	PublishedDate  *time.Time
 	DiscoveredDate *time.Time
 	IsRead         bool
-	HasNote        bool // 文章备注状态
-	IsFavorited    bool // 文章收藏状态
-	HNURL          string   // Hacker News 讨论链接
-	HNStatus       HNStatus // HN 链接搜索状态
+	HasNote        bool       // 文章备注状态
+	IsFavorited    bool       // 文章收藏状态
+	FavoritedAt    *time.Time // 收藏时间，未收藏为 nil
+	ReadAt         *time.Time // 已读时间，未读为 nil
+	HNURL          string     // Hacker News 讨论链接
+	HNStatus       HNStatus   // HN 链接搜索状态
 }
 
 // ArticleWithBlog extends Article with blog metadata for display in article cards.
@@ -49,11 +51,13 @@ type ArticleWithBlog struct {
 	IsRead         bool
 	BlogName       string
 	BlogURL        string
-	HasNote        bool // 文章备注状态
-	IsFavorited    bool // 文章收藏状态
-	HNURL          string   // Hacker News 讨论链接
-	HNStatus       HNStatus // HN 链接搜索状态
-	Tags           []Tag    // 文章标签，列表渲染时由批量查询装配
+	HasNote        bool       // 文章备注状态
+	IsFavorited    bool       // 文章收藏状态
+	FavoritedAt    *time.Time // 收藏时间，未收藏为 nil
+	ReadAt         *time.Time // 已读时间，未读为 nil
+	HNURL          string     // Hacker News 讨论链接
+	HNStatus       HNStatus   // HN 链接搜索状态
+	Tags           []Tag      // 文章标签，列表渲染时由批量查询装配
 }
 
 // SearchOptions contains all filter parameters for article search.
@@ -68,6 +72,7 @@ type SearchOptions struct {
 	Limit       int        // 0 = use default (20)
 	Offset      int        // 0 = start from beginning
 	TagName     string     // 空字符串 = 不按标签筛选；非空 = 该标签下的文章
+	Sort        string     // "published"(默认) | "favorited" | "read"
 }
 
 // DefaultPageSize is the default number of articles per page.
@@ -91,3 +96,10 @@ type Tag struct {
 	CreatedAt    time.Time
 	ArticleCount int64 // 仅 ListTags 时填充，其余方法为 0
 }
+
+// Sort 取值常量
+const (
+	SortPublished = "published"
+	SortFavorited = "favorited"
+	SortRead      = "read"
+)

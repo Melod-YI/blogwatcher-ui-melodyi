@@ -1242,3 +1242,265 @@ func TestSearchArticles_TagFilter(t *testing.T) {
 		t.Fatalf("expected assembled tags, got %d", len(got[0].Tags))
 	}
 }
+
+func TestMigrationsAddFavoritedAtAndReadAt(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "blogwatcher.db")
+
+	db, err := OpenDatabase(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.Close()
+
+	// Re-open: idempotent, must not error on already-existing columns
+	db, err = OpenDatabase(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+
+	if !db.columnExists("articles", "favorited_at") {
+		t.Fatal("expected favorited_at column to exist")
+	}
+	if !db.columnExists("articles", "read_at") {
+		t.Fatal("expected read_at column to exist")
+	}
+}
+
+func TestScanReadsFavoritedAtAndReadAt(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, err := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+
+	pub := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	inserted, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A", URL: "https://example.com/a", PublishedDate: &pub, HNStatus: model.HNStatusNotSearch},
+	})
+	if err != nil || inserted != 1 {
+		t.Fatalf("add articles: inserted=%d err=%v", inserted, err)
+	}
+
+	all, _ := db.ListArticles(false, nil)
+	id := all[0].ID
+
+	favTime := time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)
+	readTime := time.Date(2026, 3, 3, 0, 0, 0, 0, time.UTC)
+	if _, err := db.conn.Exec(
+		`UPDATE articles SET favorited_at=?, read_at=? WHERE id=?`,
+		favTime.Format(time.RFC3339Nano), readTime.Format(time.RFC3339Nano), id,
+	); err != nil {
+		t.Fatalf("raw set timestamps: %v", err)
+	}
+
+	// scanArticle path (GetArticleByID)
+	a, err := db.GetArticleByID(id)
+	if err != nil || a == nil {
+		t.Fatalf("get by id: %v %v", a, err)
+	}
+	if a.FavoritedAt == nil || !a.FavoritedAt.Equal(favTime) {
+		t.Errorf("GetArticleByID FavoritedAt = %v, want %v", a.FavoritedAt, favTime)
+	}
+	if a.ReadAt == nil || !a.ReadAt.Equal(readTime) {
+		t.Errorf("GetArticleByID ReadAt = %v, want %v", a.ReadAt, readTime)
+	}
+
+	// scanArticleWithBlog path (ListArticlesWithBlog)
+	wb, err := db.ListArticlesWithBlog(false, nil)
+	if err != nil || len(wb) != 1 {
+		t.Fatalf("ListArticlesWithBlog: %v count=%d", err, len(wb))
+	}
+	if wb[0].FavoritedAt == nil || !wb[0].FavoritedAt.Equal(favTime) {
+		t.Errorf("ListArticlesWithBlog FavoritedAt = %v", wb[0].FavoritedAt)
+	}
+
+	// scanArticleWithBlogAndCount path (SearchArticles)
+	isRead := false
+	res, _, err := db.SearchArticles(model.SearchOptions{IsRead: &isRead})
+	if err != nil || len(res) != 1 {
+		t.Fatalf("SearchArticles: %v count=%d", err, len(res))
+	}
+	if res[0].FavoritedAt == nil || !res[0].FavoritedAt.Equal(favTime) {
+		t.Errorf("SearchArticles FavoritedAt = %v", res[0].FavoritedAt)
+	}
+	if res[0].ReadAt == nil || !res[0].ReadAt.Equal(readTime) {
+		t.Errorf("SearchArticles ReadAt = %v", res[0].ReadAt)
+	}
+}
+
+func TestFavoriteArticleSetsFavoritedAt(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+	if _, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A", URL: "https://example.com/a", HNStatus: model.HNStatusNotSearch},
+	}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	all, _ := db.ListArticles(false, nil)
+	id := all[0].ID
+
+	if err := db.FavoriteArticle(id); err != nil {
+		t.Fatalf("favorite: %v", err)
+	}
+	a, _ := db.GetArticleByID(id)
+	if a.FavoritedAt == nil {
+		t.Fatal("expected favorited_at to be set after favorite")
+	}
+
+	if err := db.UnfavoriteArticle(id); err != nil {
+		t.Fatalf("unfavorite: %v", err)
+	}
+	a, _ = db.GetArticleByID(id)
+	if a.FavoritedAt != nil {
+		t.Fatalf("expected favorited_at to be nil after unfavorite, got %v", a.FavoritedAt)
+	}
+	if a.IsFavorited {
+		t.Fatal("expected is_favorited=false after unfavorite")
+	}
+}
+
+func TestMarkArticleReadSetsReadAt(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+	if _, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A", URL: "https://example.com/a", HNStatus: model.HNStatusNotSearch},
+	}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	all, _ := db.ListArticles(false, nil)
+	id := all[0].ID
+
+	if _, err := db.MarkArticleRead(id); err != nil {
+		t.Fatalf("mark read: %v", err)
+	}
+	a, _ := db.GetArticleByID(id)
+	if a.ReadAt == nil {
+		t.Fatal("expected read_at set after mark read")
+	}
+
+	if _, err := db.MarkArticleUnread(id); err != nil {
+		t.Fatalf("mark unread: %v", err)
+	}
+	a, _ = db.GetArticleByID(id)
+	if a.ReadAt != nil {
+		t.Fatalf("expected read_at nil after unread, got %v", a.ReadAt)
+	}
+	if a.IsRead {
+		t.Fatal("expected is_read=false after unread")
+	}
+}
+
+func TestMarkAllUnreadArticlesReadSetsReadAt(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+	if _, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A", URL: "https://example.com/a", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "B", URL: "https://example.com/b", HNStatus: model.HNStatusNotSearch},
+	}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+
+	if err := db.MarkAllUnreadArticlesRead(nil); err != nil {
+		t.Fatalf("mark all: %v", err)
+	}
+	all, _ := db.ListArticlesByReadStatus(true, nil)
+	for _, a := range all {
+		if a.ReadAt == nil {
+			t.Errorf("article %d: expected read_at set", a.ID)
+		}
+	}
+}
+
+func TestSearchArticlesSortByFavorited(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+
+	// 两个收藏文章的 favorited_at 顺序与 discovered 相反，以验证排序按 favorited_at 而非 discovered_date
+	d1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	d2 := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	d3 := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)
+	favLate := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	favEarly := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+
+	arts := []model.Article{
+		{BlogID: blog.ID, Title: "no-fav", URL: "https://example.com/1", DiscoveredDate: &d1, HNStatus: model.HNStatusNotSearch},
+		// fav-early: discovered 最新(d3) 但 favorited_at 较早(favEarly)；fav-late: discovered 较旧(d2) 但 favorited_at 较晚(favLate)
+		{BlogID: blog.ID, Title: "fav-early", URL: "https://example.com/2", DiscoveredDate: &d3, HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "fav-late", URL: "https://example.com/3", DiscoveredDate: &d2, HNStatus: model.HNStatusNotSearch},
+	}
+	if _, _, err := db.AddArticlesBulk(arts); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	all, _ := db.ListArticles(false, nil)
+	idMap := map[string]int64{}
+	for _, a := range all {
+		idMap[a.Title] = a.ID
+	}
+	db.conn.Exec(`UPDATE articles SET is_favorited=1, favorited_at=? WHERE id=?`, favEarly.Format(time.RFC3339Nano), idMap["fav-early"])
+	db.conn.Exec(`UPDATE articles SET is_favorited=1, favorited_at=? WHERE id=?`, favLate.Format(time.RFC3339Nano), idMap["fav-late"])
+
+	isFav := true
+	res, _, err := db.SearchArticles(model.SearchOptions{IsFavorited: &isFav, Sort: model.SortFavorited})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("expected 2 favorited, got %d", len(res))
+	}
+	if res[0].Title != "fav-late" || res[1].Title != "fav-early" {
+		t.Errorf("order = %s, %s; want fav-late, fav-early", res[0].Title, res[1].Title)
+	}
+}
+
+func TestSearchArticlesSortByReadWithNullFallback(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+
+	d1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	d2 := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	readLate := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	// read-set 的 discovered(d1) 较旧，但 read_at=readLate 最新；read-null 的 discovered(d2) 较新，read_at NULL 回退到 d2
+	arts := []model.Article{
+		{BlogID: blog.ID, Title: "read-null", URL: "https://example.com/1", DiscoveredDate: &d2, HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "read-set", URL: "https://example.com/2", DiscoveredDate: &d1, HNStatus: model.HNStatusNotSearch},
+	}
+	if _, _, err := db.AddArticlesBulk(arts); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	all, _ := db.ListArticles(false, nil)
+	for _, a := range all {
+		if a.Title == "read-set" {
+			db.conn.Exec(`UPDATE articles SET is_read=1, read_at=? WHERE id=?`, readLate.Format(time.RFC3339Nano), a.ID)
+		} else {
+			db.conn.Exec(`UPDATE articles SET is_read=1 WHERE id=?`, a.ID) // read_at stays NULL
+		}
+	}
+
+	isRead := true
+	res, _, err := db.SearchArticles(model.SearchOptions{IsRead: &isRead, Sort: model.SortRead})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("expected 2 read, got %d", len(res))
+	}
+	// read-set has read_at=readLate (newest) -> first; read-null falls back to d1 (older) -> second
+	if res[0].Title != "read-set" || res[1].Title != "read-null" {
+		t.Errorf("order = %s, %s; want read-set, read-null", res[0].Title, res[1].Title)
+	}
+}

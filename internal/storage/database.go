@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -229,6 +230,20 @@ func (db *Database) ensureMigrations() error {
 			PRIMARY KEY (tag_id, article_id)
 		)`); err != nil {
 			return fmt.Errorf("failed to create article_tags table: %w", err)
+		}
+	}
+
+	// Add favorited_at column if it doesn't exist
+	if !db.columnExists("articles", "favorited_at") {
+		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN favorited_at TIMESTAMP`); err != nil {
+			return fmt.Errorf("failed to add favorited_at column: %w", err)
+		}
+	}
+
+	// Add read_at column if it doesn't exist
+	if !db.columnExists("articles", "read_at") {
+		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN read_at TIMESTAMP`); err != nil {
+			return fmt.Errorf("failed to add read_at column: %w", err)
 		}
 	}
 
@@ -588,7 +603,7 @@ func (db *Database) ListBlogsWithCountsByCategoryID(categoryID int64) ([]BlogWit
 }
 
 func (db *Database) ListArticles(unreadOnly bool, blogID *int64) ([]model.Article, error) {
-	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status, is_favorited FROM articles WHERE 1=1`
+	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status, is_favorited, favorited_at, read_at FROM articles WHERE 1=1`
 	var args []interface{}
 	if unreadOnly {
 		query += " AND is_read = 0"
@@ -622,7 +637,7 @@ func (db *Database) ListArticles(unreadOnly bool, blogID *int64) ([]model.Articl
 // isRead=true returns read articles, isRead=false returns unread articles.
 // blogID filters to a specific blog if provided.
 func (db *Database) ListArticlesByReadStatus(isRead bool, blogID *int64) ([]model.Article, error) {
-	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status, is_favorited FROM articles WHERE is_read = ?`
+	query := `SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status, is_favorited, favorited_at, read_at FROM articles WHERE is_read = ?`
 	args := []interface{}{isRead}
 
 	if blogID != nil {
@@ -654,7 +669,7 @@ func (db *Database) ListArticlesByReadStatus(isRead bool, blogID *int64) ([]mode
 // Uses INNER JOIN to fetch blog info alongside article data.
 // isRead filters by read status, blogID optionally filters to a specific blog.
 func (db *Database) ListArticlesWithBlog(isRead bool, blogID *int64) ([]model.ArticleWithBlog, error) {
-	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited
+	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited, a.favorited_at, a.read_at
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id
 		WHERE a.is_read = ?`
@@ -691,7 +706,7 @@ func (db *Database) ListArticlesWithBlog(isRead bool, blogID *int64) ([]model.Ar
 func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWithBlog, int, error) {
 	// Build base query - conditionally add FTS5 JOIN only when searching
 	var query strings.Builder
-	query.WriteString(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited, COUNT(*) OVER() as total_count
+	query.WriteString(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited, a.favorited_at, a.read_at, COUNT(*) OVER() as total_count
 		FROM articles a`)
 
 	var conditions []string
@@ -749,7 +764,16 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 		query.WriteString(strings.Join(conditions, " AND "))
 	}
 
-	query.WriteString(" ORDER BY COALESCE(a.published_date, a.discovered_date) DESC")
+	var orderBy string
+	switch opts.Sort {
+	case model.SortFavorited:
+		orderBy = "COALESCE(a.favorited_at, a.discovered_date) DESC"
+	case model.SortRead:
+		orderBy = "COALESCE(a.read_at, a.discovered_date) DESC"
+	default:
+		orderBy = "COALESCE(a.published_date, a.discovered_date) DESC"
+	}
+	query.WriteString(" ORDER BY " + orderBy)
 
 	// Add pagination
 	limit := opts.Limit
@@ -803,7 +827,9 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 }
 
 func (db *Database) MarkArticleRead(id int64) (bool, error) {
-	result, err := db.conn.Exec(`UPDATE articles SET is_read = 1 WHERE id = ?`, id)
+	now := time.Now().Format(sqliteTimeLayout)
+	log.Printf("[Storage] MarkArticleRead: id=%d time=%s", id, now)
+	result, err := db.conn.Exec(`UPDATE articles SET is_read = 1, read_at = ? WHERE id = ?`, now, id)
 	if err != nil {
 		return false, err
 	}
@@ -815,7 +841,8 @@ func (db *Database) MarkArticleRead(id int64) (bool, error) {
 }
 
 func (db *Database) MarkArticleUnread(id int64) (bool, error) {
-	result, err := db.conn.Exec(`UPDATE articles SET is_read = 0 WHERE id = ?`, id)
+	log.Printf("[Storage] MarkArticleUnread: id=%d", id)
+	result, err := db.conn.Exec(`UPDATE articles SET is_read = 0, read_at = NULL WHERE id = ?`, id)
 	if err != nil {
 		return false, err
 	}
@@ -846,7 +873,9 @@ func (db *Database) UpdateArticleHasNote(id int64, hasNote bool) error {
 // FavoriteArticle marks an article as favorited.
 // Returns error if the article does not exist.
 func (db *Database) FavoriteArticle(id int64) error {
-	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 1 WHERE id = ?`, id)
+	now := time.Now().Format(sqliteTimeLayout)
+	log.Printf("[Storage] FavoriteArticle: id=%d time=%s", id, now)
+	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 1, favorited_at = ? WHERE id = ?`, now, id)
 	if err != nil {
 		return fmt.Errorf("failed to favorite article: %w", err)
 	}
@@ -863,7 +892,8 @@ func (db *Database) FavoriteArticle(id int64) error {
 // UnfavoriteArticle removes the favorite mark from an article.
 // Returns error if the article does not exist.
 func (db *Database) UnfavoriteArticle(id int64) error {
-	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 0 WHERE id = ?`, id)
+	log.Printf("[Storage] UnfavoriteArticle: id=%d", id)
+	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 0, favorited_at = NULL WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("failed to unfavorite article: %w", err)
 	}
@@ -880,8 +910,11 @@ func (db *Database) UnfavoriteArticle(id int64) error {
 // MarkAllUnreadArticlesRead marks all unread articles as read.
 // If blogID is provided, only marks articles from that blog.
 func (db *Database) MarkAllUnreadArticlesRead(blogID *int64) error {
-	query := `UPDATE articles SET is_read = 1 WHERE is_read = 0`
+	now := time.Now().Format(sqliteTimeLayout)
+	log.Printf("[Storage] MarkAllUnreadArticlesRead: blog=%v time=%s", blogID, now)
+	query := `UPDATE articles SET is_read = 1, read_at = ? WHERE is_read = 0`
 	var args []interface{}
+	args = append(args, now)
 
 	if blogID != nil {
 		query += " AND blog_id = ?"
@@ -918,7 +951,7 @@ func (db *Database) GetBlogByID(id int64) (*model.Blog, error) {
 
 // GetArticleByID returns an article by its ID, or nil if not found.
 func (db *Database) GetArticleByID(id int64) (*model.Article, error) {
-	row := db.conn.QueryRow(`SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status, is_favorited FROM articles WHERE id = ?`, id)
+	row := db.conn.QueryRow(`SELECT id, blog_id, title, url, thumbnail_url, published_date, discovered_date, is_read, has_note, hn_url, hn_status, is_favorited, favorited_at, read_at FROM articles WHERE id = ?`, id)
 	return scanArticle(row)
 }
 
@@ -926,7 +959,7 @@ func (db *Database) GetArticleByID(id int64) (*model.Article, error) {
 // (name + url), or nil if no article has the given id. Used by `article get <id>`.
 // 同时装配该文章的标签列表，供 CLI get 输出展示。
 func (db *Database) GetArticleWithBlogByID(id int64) (*model.ArticleWithBlog, error) {
-	row := db.conn.QueryRow(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited
+	row := db.conn.QueryRow(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited, a.favorited_at, a.read_at
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id
 		WHERE a.id = ?`, id)
@@ -1264,8 +1297,10 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 		hnURL         sql.NullString
 		hnStatus      sql.NullString
 		isFavorited   bool
+		favoritedAt  sql.NullString
+		readAt        sql.NullString
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &isFavorited); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &isFavorited, &favoritedAt, &readAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -1292,6 +1327,16 @@ func scanArticle(scanner interface{ Scan(dest ...any) error }) (*model.Article, 
 	if discovered.Valid {
 		if parsed, err := parseTime(discovered.String); err == nil {
 			article.DiscoveredDate = &parsed
+		}
+	}
+	if favoritedAt.Valid {
+		if parsed, err := parseTime(favoritedAt.String); err == nil {
+			article.FavoritedAt = &parsed
+		}
+	}
+	if readAt.Valid {
+		if parsed, err := parseTime(readAt.String); err == nil {
+			article.ReadAt = &parsed
 		}
 	}
 
@@ -1340,8 +1385,10 @@ func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.A
 		blogName      string
 		blogURL       string
 		isFavorited   bool
+		favoritedAt  sql.NullString
+		readAt        sql.NullString
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &blogName, &blogURL, &isFavorited); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &blogName, &blogURL, &isFavorited, &favoritedAt, &readAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -1372,6 +1419,16 @@ func scanArticleWithBlog(scanner interface{ Scan(dest ...any) error }) (*model.A
 			article.DiscoveredDate = &parsed
 		}
 	}
+	if favoritedAt.Valid {
+		if parsed, err := parseTime(favoritedAt.String); err == nil {
+			article.FavoritedAt = &parsed
+		}
+	}
+	if readAt.Valid {
+		if parsed, err := parseTime(readAt.String); err == nil {
+			article.ReadAt = &parsed
+		}
+	}
 
 	return article, nil
 }
@@ -1392,9 +1449,11 @@ func scanArticleWithBlogAndCount(scanner interface{ Scan(dest ...any) error }) (
 		blogName      string
 		blogURL       string
 		isFavorited   bool
+		favoritedAt  sql.NullString
+		readAt        sql.NullString
 		totalCount    int
 	)
-	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &blogName, &blogURL, &isFavorited, &totalCount); err != nil {
+	if err := scanner.Scan(&id, &blogID, &title, &url, &thumbnailURL, &publishedDate, &discovered, &isRead, &hasNote, &hnURL, &hnStatus, &blogName, &blogURL, &isFavorited, &favoritedAt, &readAt, &totalCount); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, nil
 		}
@@ -1423,6 +1482,16 @@ func scanArticleWithBlogAndCount(scanner interface{ Scan(dest ...any) error }) (
 	if discovered.Valid {
 		if parsed, err := parseTime(discovered.String); err == nil {
 			article.DiscoveredDate = &parsed
+		}
+	}
+	if favoritedAt.Valid {
+		if parsed, err := parseTime(favoritedAt.String); err == nil {
+			article.FavoritedAt = &parsed
+		}
+	}
+	if readAt.Valid {
+		if parsed, err := parseTime(readAt.String); err == nil {
+			article.ReadAt = &parsed
 		}
 	}
 
@@ -1521,7 +1590,7 @@ type ListFilterOptions struct {
 // 支持按博客名称、分类名称、已读状态、日期、标题全文搜索筛选，用于 CLI article list 命令
 func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.ArticleWithBlog, error) {
 	// 构建基础查询（FTS5 JOIN 仅在有搜索关键词时加入）
-	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited
+	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited, a.favorited_at, a.read_at
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id`
 	if opts.SearchQuery != "" {
