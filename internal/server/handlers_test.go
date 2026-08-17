@@ -533,6 +533,9 @@ func TestParseSearchOptionsSortDefaults(t *testing.T) {
 		// 显式 sort 覆盖默认
 		{"/articles?filter=favorites&sort=published", model.SortPublished},
 		{"/articles?filter=read&sort=favorited", model.SortFavorited},
+		// 未知 sort 值回退到 filter 默认
+		{"/articles?filter=favorites&sort=bogus", model.SortFavorited},
+		{"/articles?sort=bogus", model.SortPublished},
 	}
 	for _, c := range cases {
 		req := httptest.NewRequest(http.MethodGet, c.query, nil)
