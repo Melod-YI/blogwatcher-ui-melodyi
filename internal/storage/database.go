@@ -878,6 +878,16 @@ func (db *Database) GetArticleByID(id int64) (*model.Article, error) {
 	return scanArticle(row)
 }
 
+// GetArticleWithBlogByID returns a single article joined with its blog metadata
+// (name + url), or nil if no article has the given id. Used by `article get <id>`.
+func (db *Database) GetArticleWithBlogByID(id int64) (*model.ArticleWithBlog, error) {
+	row := db.conn.QueryRow(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited
+		FROM articles a
+		INNER JOIN blogs b ON a.blog_id = b.id
+		WHERE a.id = ?`, id)
+	return scanArticleWithBlog(row)
+}
+
 // GetBlogByURL returns a blog by its URL, or nil if not found.
 func (db *Database) GetBlogByURL(url string) (*model.Blog, error) {
 	row := db.conn.QueryRow(`SELECT id, name, url, feed_url, scrape_selector, last_scanned, category_id FROM blogs WHERE url = ?`, url)
@@ -1442,63 +1452,31 @@ func (db *Database) UpdateArticleThumbnail(id int64, thumbnailURL string) error 
 // ListFilterOptions 筛选文章的选项参数
 // 用于 CLI article list 命令，支持按博客名称、分类名称、已读状态、备注状态、日期筛选
 type ListFilterOptions struct {
-	BlogName     string     // 博客名称筛选（空表示所有博客）
-	CategoryName string     // 分类名称筛选（空表示所有分类）
-	IsRead       *bool      // 已读状态筛选（nil 表示所有状态）
-	HasNote      *bool      // 备注状态筛选（nil 表示所有状态，false 表示无备注）
-	IsFavorited  *bool      // 收藏状态筛选（nil 表示所有状态）
-	AfterDate    *time.Time // 日期筛选（nil 表示无限制）
-	Limit        int        // 结果数量限制（0 表示无限制）
-	Offset       int        // 结果偏移量（用于翻页）
+	BlogName      string     // 博客名称筛选（空表示所有博客）
+	CategoryName  string     // 分类名称筛选（空表示所有分类）
+	IsRead        *bool      // 已读状态筛选（nil 表示所有状态）
+	HasNote       *bool      // 备注状态筛选（nil 表示所有状态，false 表示无备注）
+	IsFavorited   *bool      // 收藏状态筛选（nil 表示所有状态）
+	AfterDate     *time.Time // 日期筛选（nil 表示无限制）
+	SearchQuery   string     // 标题全文搜索关键词（空表示不触发 FTS5）
+	Limit         int        // 结果数量限制（0 表示无限制）
+	Offset        int        // 结果偏移量（用于翻页）
 }
 
 // ListArticlesWithFilters 根据筛选选项列出文章（带博客信息）
-// 支持按博客名称、分类名称、已读状态、日期筛选，用于 CLI article list 命令
+// 支持按博客名称、分类名称、已读状态、日期、标题全文搜索筛选，用于 CLI article list 命令
 func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.ArticleWithBlog, error) {
-	// 构建基础查询
+	// 构建基础查询（FTS5 JOIN 仅在有搜索关键词时加入）
 	query := `SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited
 		FROM articles a
-		INNER JOIN blogs b ON a.blog_id = b.id
-		WHERE 1=1`
-
-	var conditions []string
-	var args []interface{}
-
-	// 博客名称筛选（通过子查询获取 blog_id）
-	if opts.BlogName != "" {
-		conditions = append(conditions, "a.blog_id = (SELECT id FROM blogs WHERE name = ?)")
-		args = append(args, opts.BlogName)
+		INNER JOIN blogs b ON a.blog_id = b.id`
+	if opts.SearchQuery != "" {
+		query += " JOIN articles_fts ON a.id = articles_fts.rowid"
 	}
+	query += " WHERE 1=1"
 
-	// 分类名称筛选（通过子查询获取 category_id）
-	if opts.CategoryName != "" {
-		conditions = append(conditions, "b.category_id = (SELECT id FROM categories WHERE name = ?)")
-		args = append(args, opts.CategoryName)
-	}
-
-	// 已读状态筛选
-	if opts.IsRead != nil {
-		conditions = append(conditions, "a.is_read = ?")
-		args = append(args, *opts.IsRead)
-	}
-
-	// 备注状态筛选
-	if opts.HasNote != nil {
-		conditions = append(conditions, "a.has_note = ?")
-		args = append(args, *opts.HasNote)
-	}
-
-	// 收藏状态筛选
-	if opts.IsFavorited != nil {
-		conditions = append(conditions, "a.is_favorited = ?")
-		args = append(args, *opts.IsFavorited)
-	}
-
-	// 日期筛选（使用 published_date 或 discovered_date）
-	if opts.AfterDate != nil {
-		conditions = append(conditions, "COALESCE(a.published_date, a.discovered_date) >= ?")
-		args = append(args, opts.AfterDate.Format("2006-01-02"))
-	}
+	// 构建筛选条件（与 CountArticlesWithFilters 共用 buildFilterConditions）
+	conditions, args := buildFilterConditions(opts)
 
 	// 添加 WHERE 条件
 	if len(conditions) > 0 {
@@ -1866,6 +1844,12 @@ func buildFilterConditions(opts ListFilterOptions) ([]string, []interface{}) {
 		args = append(args, opts.AfterDate.Format("2006-01-02"))
 	}
 
+	// 标题全文搜索（FTS5，仅索引 articles_fts 的 title 列）
+	if opts.SearchQuery != "" {
+		conditions = append(conditions, "articles_fts MATCH ?")
+		args = append(args, sanitizeFTS5Query(opts.SearchQuery))
+	}
+
 	return conditions, args
 }
 
@@ -1875,8 +1859,12 @@ func (db *Database) CountArticlesWithFilters(opts ListFilterOptions) (int64, err
 	// 构建筛选条件
 	conditions, args := buildFilterConditions(opts)
 
-	// 构建计数查询
-	query := `SELECT COUNT(*) FROM articles a INNER JOIN blogs b ON a.blog_id = b.id WHERE 1=1`
+	// 构建计数查询（FTS5 JOIN 仅在有搜索关键词时加入，MATCH 是 WHERE 条件）
+	query := `SELECT COUNT(*) FROM articles a INNER JOIN blogs b ON a.blog_id = b.id`
+	if opts.SearchQuery != "" {
+		query += " JOIN articles_fts ON a.id = articles_fts.rowid"
+	}
+	query += " WHERE 1=1"
 
 	// 添加 WHERE 条件
 	if len(conditions) > 0 {

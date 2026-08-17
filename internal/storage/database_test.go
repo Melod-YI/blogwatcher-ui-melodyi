@@ -646,6 +646,131 @@ func TestSanitizeFTS5Query(t *testing.T) {
 	}
 }
 
+func TestGetArticleWithBlogByID(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, err := db.AddBlog(model.Blog{Name: "Test Blog", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+
+	articles := []model.Article{
+		{BlogID: blog.ID, Title: "Go Concurrency Patterns", URL: "https://example.com/1", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "Rust Ownership", URL: "https://example.com/2", HNStatus: model.HNStatusNotSearch},
+	}
+	inserted, _, err := db.AddArticlesBulk(articles)
+	if err != nil || inserted != 2 {
+		t.Fatalf("add articles: inserted=%d, err=%v", inserted, err)
+	}
+
+	all, err := db.ListArticles(false, nil)
+	if err != nil || len(all) != 2 {
+		t.Fatalf("list articles: %v, count=%d", err, len(all))
+	}
+
+	// 按 URL 找到目标文章 ID（ListArticles 顺序不保证）
+	var targetID int64
+	for _, a := range all {
+		if a.URL == "https://example.com/1" {
+			targetID = a.ID
+		}
+	}
+	if targetID == 0 {
+		t.Fatal("未找到目标文章")
+	}
+
+	got, err := db.GetArticleWithBlogByID(targetID)
+	if err != nil {
+		t.Fatalf("get article with blog: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected article, got nil")
+	}
+	if got.Title != "Go Concurrency Patterns" {
+		t.Errorf("Title = %q, want %q", got.Title, "Go Concurrency Patterns")
+	}
+	if got.BlogName != "Test Blog" {
+		t.Errorf("BlogName = %q, want %q", got.BlogName, "Test Blog")
+	}
+	if got.BlogURL != "https://example.com" {
+		t.Errorf("BlogURL = %q, want %q", got.BlogURL, "https://example.com")
+	}
+
+	// 不存在的 ID 返回 nil, nil
+	missing, err := db.GetArticleWithBlogByID(99999)
+	if err != nil {
+		t.Fatalf("get missing article: %v", err)
+	}
+	if missing != nil {
+		t.Fatalf("expected nil for non-existent id, got %+v", missing)
+	}
+}
+
+func TestListArticlesWithFiltersSearch(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, err := db.AddBlog(model.Blog{Name: "Test Blog", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+
+	articles := []model.Article{
+		{BlogID: blog.ID, Title: "Go Concurrency Patterns", URL: "https://example.com/1", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "Rust Ownership", URL: "https://example.com/2", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "Concurrency in Go", URL: "https://example.com/3", HNStatus: model.HNStatusNotSearch},
+	}
+	inserted, _, err := db.AddArticlesBulk(articles)
+	if err != nil || inserted != 3 {
+		t.Fatalf("add articles: inserted=%d, err=%v", inserted, err)
+	}
+
+	// 按标题全文搜索 "Concurrency"（FTS5 仅索引 title），应命中 /1 和 /3
+	results, err := db.ListArticlesWithFilters(ListFilterOptions{SearchQuery: "Concurrency", Limit: 100})
+	if err != nil {
+		t.Fatalf("list with search: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 search results, got %d", len(results))
+	}
+	gotURLs := map[string]bool{}
+	for _, r := range results {
+		gotURLs[r.URL] = true
+	}
+	if !gotURLs["https://example.com/1"] || !gotURLs["https://example.com/3"] {
+		t.Errorf("search results URLs = %v, want /1 and /3", gotURLs)
+	}
+
+	// count 与 list 一致
+	count, err := db.CountArticlesWithFilters(ListFilterOptions{SearchQuery: "Concurrency"})
+	if err != nil {
+		t.Fatalf("count with search: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("count = %d, want 2", count)
+	}
+
+	// 空 SearchQuery 不触发 FTS，返回全部 3 条（行为不变）
+	all, err := db.ListArticlesWithFilters(ListFilterOptions{Limit: 100})
+	if err != nil {
+		t.Fatalf("list without search: %v", err)
+	}
+	if len(all) != 3 {
+		t.Errorf("expected 3 results without search, got %d", len(all))
+	}
+
+	// FTS5 特殊字符经 sanitize 后不报语法错
+	special, err := db.ListArticlesWithFilters(ListFilterOptions{SearchQuery: "a-b", Limit: 100})
+	if err != nil {
+		t.Fatalf("list with special-char search: %v", err)
+	}
+	// "a-b" 经 sanitize 成短语，无匹配标题，期望 0 条
+	if len(special) != 0 {
+		t.Errorf("expected 0 results for special-char search, got %d", len(special))
+	}
+}
+
 func TestFavoriteArticle(t *testing.T) {
 	db := openTestDB(t)
 	defer db.Close()

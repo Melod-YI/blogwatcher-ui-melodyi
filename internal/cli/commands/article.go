@@ -10,6 +10,7 @@ import (
 
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/cli/flags"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/cli/output"
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/storage"
 	"github.com/spf13/cobra"
 )
@@ -31,6 +32,7 @@ func NewArticleCmd() *cobra.Command {
 
 子命令：
   list        列出文章，支持筛选和多种输出格式
+  get         按 ID 查询单篇文章详情
   mark-read   标记文章已读（单篇或全部）
   mark-unread 标记文章未读
   favorite    收藏文章
@@ -39,6 +41,7 @@ func NewArticleCmd() *cobra.Command {
 
 	// 添加子命令
 	cmd.AddCommand(NewListCmd())
+	cmd.AddCommand(NewGetCmd())
 	cmd.AddCommand(NewMarkReadCmd())
 	cmd.AddCommand(NewMarkUnreadCmd())
 	cmd.AddCommand(NewFavoriteCmd())
@@ -63,6 +66,7 @@ func NewListCmd() *cobra.Command {
   --noted          仅显示有备注文章
   --not-noted      仅显示无备注文章
   --favorited      仅显示收藏文章
+  --search <kw>    按标题全文搜索（FTS5）
   --after <date>   显示指定日期之后的文章（格式 YYYY-MM-DD）
   --limit <n>      最多返回 n 条结果（默认 20，最大 100，0 表示无限制）
   --offset <n>     跳过前 n 条结果（用于翻页）
@@ -82,6 +86,8 @@ func NewListCmd() *cobra.Command {
   blogwatcher article list --blog "Tech Blog" --unread --after 2026-01-01
   blogwatcher article list --unread --limit 10
   blogwatcher article list --limit 20 --offset 20  # 第二页
+  blogwatcher article list --search "go"           # 按标题全文搜索
+  blogwatcher article list --search "go" --unread  # 搜索可与其它筛选组合
   blogwatcher article list --format json`,
 		Run: runList,
 	}
@@ -94,6 +100,7 @@ func NewListCmd() *cobra.Command {
 	cmd.Flags().Bool("noted", false, "仅有备注文章")
 	cmd.Flags().Bool("not-noted", false, "仅无备注文章")
 	cmd.Flags().Bool("favorited", false, "仅收藏文章")
+	cmd.Flags().String("search", "", "标题全文搜索关键词（FTS5）")
 	cmd.Flags().String("after", "", "日期筛选（格式 YYYY-MM-DD）")
 	cmd.Flags().Int("limit", DefaultLimit, fmt.Sprintf("返回结果数量限制（默认 %d，最大 %d，0 表示无限制）", DefaultLimit, MaxLimit))
 	cmd.Flags().Int("offset", 0, "结果偏移量（用于翻页）")
@@ -172,6 +179,7 @@ func runList(cmd *cobra.Command, args []string) {
 	read, _ := cmd.Flags().GetBool("read")
 	noted, _ := cmd.Flags().GetBool("noted")
 	notNoted, _ := cmd.Flags().GetBool("not-noted")
+	search, _ := cmd.Flags().GetString("search")
 	afterStr, _ := cmd.Flags().GetString("after")
 	limit, _ := cmd.Flags().GetInt("limit")
 	offset, _ := cmd.Flags().GetInt("offset")
@@ -207,6 +215,7 @@ func runList(cmd *cobra.Command, args []string) {
 	opts := storage.ListFilterOptions{
 		BlogName:     blogName,
 		CategoryName: categoryName,
+		SearchQuery:  search,
 		Limit:        limit,
 		Offset:       offset,
 	}
@@ -551,4 +560,93 @@ func runUnfavorite(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("已取消收藏: %s\n", article.Title)
+}
+
+// NewGetCmd 创建 get 子命令
+// 按文章 ID 查询单篇文章完整详情（含博客名）
+func NewGetCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get <id>",
+		Short: "按 ID 查询单篇文章",
+		Long: `按文章 ID 查询单篇文章的完整详情（含博客名、HN 链接、收藏/已读/备注状态等）。
+
+输出格式：
+  --format table   表格格式（默认）
+  --format json    JSON 格式（含 url/hn_url/hn_status/has_note/is_favorited 等完整字段）
+  --format simple  简洁格式
+
+示例：
+  blogwatcher article get 1
+  blogwatcher article get 1 --format json`,
+		Args: cobra.ExactArgs(1),
+		Run:  runGet,
+	}
+
+	cmd.Flags().String("format", "table", "输出格式（table|json|simple）")
+
+	return cmd
+}
+
+// runGet 执行 get 命令
+// 按文章 ID 查询单篇并输出
+func runGet(cmd *cobra.Command, args []string) {
+	// 获取数据库路径
+	dbPath := flags.DBPath()
+	if dbPath == "" {
+		var err error
+		dbPath, err = storage.DefaultDBPath()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "获取默认数据库路径失败: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// 打开数据库
+	db, err := storage.OpenDatabase(dbPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "打开数据库失败: %v\n", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// 解析文章 ID
+	id, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "文章 ID 格式错误: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 查询单篇文章（含博客信息）
+	article, err := db.GetArticleWithBlogByID(id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "查询文章失败: %v\n", err)
+		os.Exit(1)
+	}
+	if article == nil {
+		fmt.Fprintf(os.Stderr, "文章 %d 不存在\n", id)
+		os.Exit(1)
+	}
+
+	// 复用 list 的输出格式器（单元素切片 + 单条分页元信息）
+	articles := []model.ArticleWithBlog{*article}
+	meta := output.PaginationMeta{
+		Total:   1,
+		Count:   1,
+		Offset:  0,
+		Limit:   1,
+		HasMore: false,
+	}
+
+	format, _ := cmd.Flags().GetString("format")
+	var result string
+	switch format {
+	case "json":
+		result = output.FormatJSON(articles, meta)
+	case "simple":
+		result = output.FormatSimple(articles, meta)
+	default:
+		result = output.FormatTable(articles, meta)
+	}
+
+	fmt.Println(result)
 }
