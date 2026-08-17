@@ -725,6 +725,12 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 		args = append(args, *opts.BlogID)
 	}
 
+	// 标签筛选（EXISTS 子查询）
+	if opts.TagName != "" {
+		conditions = append(conditions, `EXISTS(SELECT 1 FROM article_tags at JOIN tags t ON t.id=at.tag_id WHERE at.article_id=a.id AND t.name=?)`)
+		args = append(args, opts.TagName)
+	}
+
 	// Add date range using COALESCE for published_date fallback to discovered_date
 	if opts.DateFrom != nil {
 		conditions = append(conditions, "COALESCE(a.published_date, a.discovered_date) >= ?")
@@ -776,6 +782,21 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
+	}
+
+	// 批量装配标签，避免 N+1
+	if len(articles) > 0 {
+		ids := make([]int64, len(articles))
+		for i, a := range articles {
+			ids[i] = a.ID
+		}
+		tagMap, err := db.GetTagsForArticles(ids)
+		if err != nil {
+			return nil, 0, err
+		}
+		for i := range articles {
+			articles[i].Tags = tagMap[articles[i].ID]
+		}
 	}
 
 	return articles, totalCount, nil
@@ -1518,6 +1539,12 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 		args = append(args, *opts.IsFavorited)
 	}
 
+	// 标签筛选（EXISTS 子查询）
+	if opts.TagName != "" {
+		conditions = append(conditions, `EXISTS(SELECT 1 FROM article_tags at JOIN tags t ON t.id=at.tag_id WHERE at.article_id=a.id AND t.name=?)`)
+		args = append(args, opts.TagName)
+	}
+
 	// 日期筛选（使用 published_date 或 discovered_date）
 	if opts.AfterDate != nil {
 		conditions = append(conditions, "COALESCE(a.published_date, a.discovered_date) >= ?")
@@ -1558,6 +1585,21 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 		}
 		if article != nil {
 			articles = append(articles, *article)
+		}
+	}
+
+	// 批量装配标签，避免 N+1
+	if len(articles) > 0 {
+		ids := make([]int64, len(articles))
+		for i, a := range articles {
+			ids[i] = a.ID
+		}
+		tagMap, err := db.GetTagsForArticles(ids)
+		if err != nil {
+			return nil, err
+		}
+		for i := range articles {
+			articles[i].Tags = tagMap[articles[i].ID]
 		}
 	}
 
@@ -2105,6 +2147,12 @@ func buildFilterConditions(opts ListFilterOptions) ([]string, []interface{}) {
 	if opts.IsFavorited != nil {
 		conditions = append(conditions, "a.is_favorited = ?")
 		args = append(args, *opts.IsFavorited)
+	}
+
+	// 标签筛选（EXISTS 子查询）
+	if opts.TagName != "" {
+		conditions = append(conditions, `EXISTS(SELECT 1 FROM article_tags at JOIN tags t ON t.id=at.tag_id WHERE at.article_id=a.id AND t.name=?)`)
+		args = append(args, opts.TagName)
 	}
 
 	// 日期筛选（使用 published_date 或 discovered_date）

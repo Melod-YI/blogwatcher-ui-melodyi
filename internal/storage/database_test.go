@@ -1064,3 +1064,56 @@ func mustGetArticleTags(t *testing.T, db *Database, articleID int64) []model.Tag
 	}
 	return tags
 }
+
+func TestListArticlesWithFilters_TagFilter(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "With", URL: "https://example.com/w", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "Without", URL: "https://example.com/wo", HNStatus: model.HNStatusNotSearch},
+	})
+	arts, _ := db.ListArticles(false, nil)
+	taggedID := arts[0].ID
+	tag, _ := db.CreateTag("Go")
+	db.AddArticleTag(taggedID, tag.ID)
+
+	got, err := db.ListArticlesWithFilters(ListFilterOptions{TagName: "Go"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != taggedID {
+		t.Fatalf("expected only tagged article, got %+v", got)
+	}
+	if len(got[0].Tags) != 1 || got[0].Tags[0].Name != "Go" {
+		t.Fatalf("expected assembled Tags, got %+v", got[0].Tags)
+	}
+}
+
+func TestSearchArticles_TagFilter(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "Tagged", URL: "https://example.com/s1", HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "Plain", URL: "https://example.com/s2", HNStatus: model.HNStatusNotSearch},
+	})
+	arts, _ := db.ListArticles(false, nil)
+	taggedID := arts[0].ID
+	tag, _ := db.CreateTag("Go")
+	db.AddArticleTag(taggedID, tag.ID)
+
+	opts := model.SearchOptions{TagName: "Go", Limit: 20}
+	got, _, err := db.SearchArticles(opts)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != taggedID {
+		t.Fatalf("expected only tagged article, got %+v", got)
+	}
+	if len(got[0].Tags) != 1 {
+		t.Fatalf("expected assembled tags, got %d", len(got[0].Tags))
+	}
+}
