@@ -1,0 +1,18 @@
+{{define "article-tags-content.gohtml"}}
+<form hx-post="/articles/{{.ID}}/tags/save"
+      hx-target=".article-tags-content"
+      hx-swap="innerHTML">
+    <div class="article-tags-content tag-chips-selectable">
+        {{range .AllTags}}
+        <label class="tag-chip-selectable{{if index $.CurrentIDs .ID}} active{{end}}">
+            <input type="checkbox" name="tag_ids" value="{{.ID}}"
+                   {{if index $.CurrentIDs .ID}}checked{{end}}>
+            <span>{{.Name}}</span>
+        </label>
+        {{else}}
+        <p class="tags-empty">暂无标签，先到 <a href="/tags">标签管理</a> 创建。</p>
+        {{end}}
+    </div>
+    <button type="submit" class="action-btn">保存</button>
+</form>
+{{end}}

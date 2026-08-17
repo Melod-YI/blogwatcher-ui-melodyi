@@ -617,3 +617,84 @@ func TestHandleTagDelete_NotFound(t *testing.T) {
 		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
+
+func TestHandleArticleTagAdd(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{{BlogID: blog.ID, Title: "A", URL: "https://example.com/hta", HNStatus: model.HNStatusNotSearch}})
+	arts, _ := db.ListArticles(false, nil)
+	id := arts[0].ID
+
+	body := strings.NewReader("name=Go")
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/articles/%d/tags", id), body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("add: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("HX-Trigger") == "" {
+		t.Fatal("expected HX-Trigger set")
+	}
+	tags, _ := db.GetArticleTags(id)
+	if len(tags) != 1 || tags[0].Name != "Go" {
+		t.Fatalf("expected tag Go persisted, got %+v", tags)
+	}
+}
+
+func TestHandleArticleTagRemove(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{{BlogID: blog.ID, Title: "A", URL: "https://example.com/htr", HNStatus: model.HNStatusNotSearch}})
+	arts, _ := db.ListArticles(false, nil)
+	id := arts[0].ID
+	tag, _ := db.CreateTag("Go")
+	db.AddArticleTag(id, tag.ID)
+
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/articles/%d/tags/%d", id, tag.ID), nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("remove: status=%d", rec.Code)
+	}
+	tags, _ := db.GetArticleTags(id)
+	if len(tags) != 0 {
+		t.Fatalf("expected 0 tags, got %d", len(tags))
+	}
+}
+
+func TestHandleArticleTags_NonExistentArticle(t *testing.T) {
+	srv := createTestServer(t)
+	req := httptest.NewRequest(http.MethodGet, "/articles/99999/tags", nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestHandleArticleTagSave(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	db.AddArticlesBulk([]model.Article{{BlogID: blog.ID, Title: "A", URL: "https://example.com/hts", HNStatus: model.HNStatusNotSearch}})
+	arts, _ := db.ListArticles(false, nil)
+	id := arts[0].ID
+	t1, _ := db.CreateTag("a")
+	t2, _ := db.CreateTag("b")
+
+	form := fmt.Sprintf("tag_ids=%d&tag_ids=%d", t1.ID, t2.ID)
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/articles/%d/tags/save", id), strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save: status=%d", rec.Code)
+	}
+	tags, _ := db.GetArticleTags(id)
+	if len(tags) != 2 {
+		t.Fatalf("expected 2 tags, got %d", len(tags))
+	}
+}

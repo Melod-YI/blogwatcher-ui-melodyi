@@ -1,0 +1,30 @@
+{{define "article-tags-edit.gohtml"}}
+<div class="tag-popover" id="tag-popover-{{.ID}}">
+    <div class="tag-popover-current">
+        {{range .Current}}
+        <span class="tag-chip">
+            {{.Name}}
+            <button class="tag-chip-remove"
+                    hx-delete="/articles/{{$.ID}}/tags/{{.ID}}"
+                    hx-target="#tag-popover-{{$.ID}}"
+                    hx-swap="outerHTML"
+                    onclick="event.stopPropagation();">×</button>
+        </span>
+        {{else}}
+        <span class="tag-popover-empty">暂无标签</span>
+        {{end}}
+    </div>
+    <form class="tag-popover-form"
+          hx-post="/articles/{{.ID}}/tags"
+          hx-target="#tag-popover-{{.ID}}"
+          hx-swap="outerHTML">
+        <input type="text" name="name" list="tag-options-{{.ID}}" placeholder="选择或输入标签" autocomplete="off">
+        <datalist id="tag-options-{{.ID}}">
+            {{range .AllTags}}{{if not (index $.CurrentIDs .ID)}}
+            <option value="{{.Name}}">{{.Name}}</option>
+            {{end}}{{end}}
+        </datalist>
+        <button type="submit" class="action-btn">添加</button>
+    </form>
+</div>
+{{end}}

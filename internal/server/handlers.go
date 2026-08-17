@@ -1515,3 +1515,144 @@ func (s *Server) handleTagDelete(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Trigger", "articleListUpdated")
 	s.renderTagsContent(w)
 }
+
+// handleArticleTagsPage 渲染单文标签管理页（整页导航）。
+func (s *Server) handleArticleTagsPage(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	article, err := s.db.GetArticleByID(id)
+	if err != nil {
+		log.Printf("Error fetching article %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if article == nil {
+		http.Error(w, "Article not found", http.StatusNotFound)
+		return
+	}
+	data := s.buildArticleTagsData(id)
+	data["Title"] = article.Title
+	data["URL"] = article.URL
+	log.Printf("Article tags page for article %d", id)
+	s.renderTemplate(w, "article-tags.gohtml", data)
+}
+
+// handleArticleTagsEditPartial 渲染卡片弹层片段（HTMX，无整页）。
+func (s *Server) handleArticleTagsEditPartial(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	data := s.buildArticleTagsData(id)
+	s.renderTemplate(w, "article-tags-edit.gohtml", data)
+}
+
+// handleArticleTagAdd 增量加标签（name，不存在自动建），成功后重渲染弹层片段。
+func (s *Server) handleArticleTagAdd(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" || utf8.RuneCountInString(name) > 50 {
+		http.Error(w, "Invalid tag name", http.StatusBadRequest)
+		return
+	}
+	article, err := s.db.GetArticleByID(id)
+	if err != nil {
+		log.Printf("Error fetching article %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if article == nil {
+		http.Error(w, "Article not found", http.StatusNotFound)
+		return
+	}
+	tag, err := s.db.CreateTag(name)
+	if err != nil {
+		log.Printf("Error creating tag '%s': %v", name, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if err := s.db.AddArticleTag(id, tag.ID); err != nil {
+		log.Printf("Error adding tag %d to article %d: %v", tag.ID, id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Added tag '%s' (id=%d) to article %d", name, tag.ID, id)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	data := s.buildArticleTagsData(id)
+	s.renderTemplate(w, "article-tags-edit.gohtml", data)
+}
+
+// handleArticleTagRemove 增量移除标签，成功后重渲染弹层片段。
+func (s *Server) handleArticleTagRemove(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	tagID, err := strconv.ParseInt(r.PathValue("tagID"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+		return
+	}
+	if err := s.db.RemoveArticleTag(id, tagID); err != nil {
+		log.Printf("Error removing tag %d from article %d: %v", tagID, id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Removed tag %d from article %d", tagID, id)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	data := s.buildArticleTagsData(id)
+	s.renderTemplate(w, "article-tags-edit.gohtml", data)
+}
+
+// handleArticleTagSave 全量替换文章标签，成功后渲染管理页 chips 区片段。
+func (s *Server) handleArticleTagSave(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+	var tagIDs []int64
+	for _, raw := range r.Form["tag_ids"] {
+		if tid, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			tagIDs = append(tagIDs, tid)
+		}
+	}
+	if err := s.db.SetArticleTags(id, tagIDs); err != nil {
+		log.Printf("Error saving tags for article %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Saved %d tags for article %d", len(tagIDs), id)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	data := s.buildArticleTagsData(id)
+	s.renderTemplate(w, "article-tags-content.gohtml", data)
+}
+
+// buildArticleTagsData 构造标签管理所需公共数据：AllTags、Current、CurrentIDs。
+func (s *Server) buildArticleTagsData(id int64) map[string]interface{} {
+	allTags, _ := s.db.ListTags()
+	current, _ := s.db.GetArticleTags(id)
+	currentIDs := map[int64]bool{}
+	for _, t := range current {
+		currentIDs[t.ID] = true
+	}
+	return map[string]interface{}{
+		"ID":         id,
+		"AllTags":    allTags,
+		"Current":    current,
+		"CurrentIDs": currentIDs,
+	}
+}

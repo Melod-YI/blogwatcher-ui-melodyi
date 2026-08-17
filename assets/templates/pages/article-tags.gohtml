@@ -1,0 +1,36 @@
+{{define "article-tags.gohtml"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#FAF8F5" media="(prefers-color-scheme: light)">
+    <script>
+    (function() {
+      var theme = localStorage.getItem('theme') || 'system';
+      var isDark = theme === 'dark' ||
+        (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+    </script>
+    <title>{{.Title}} - 标签 - BlogWatcher</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="article-tags-page">
+        <header class="article-tags-header">
+            <h1>{{.Title}}</h1>
+            <a href="{{.URL}}" target="_blank" rel="noopener noreferrer" class="article-tags-original-link">
+                查看原文 ↗
+            </a>
+        </header>
+        <main>
+            {{template "article-tags-content.gohtml" .}}
+        </main>
+    </div>
+</body>
+</html>
+{{end}}
