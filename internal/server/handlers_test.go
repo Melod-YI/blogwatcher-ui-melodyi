@@ -545,3 +545,37 @@ func TestParseSearchOptionsSortDefaults(t *testing.T) {
 		}
 	}
 }
+
+func TestArticleListRendersSortControlOnFavorites(t *testing.T) {
+	srv := createTestServer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/articles?filter=favorites", nil)
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="sort-favorited"`) {
+		t.Error("favorites page should render sort-favorited radio")
+	}
+	if !strings.Contains(body, `id="sort-published"`) {
+		t.Error("favorites page should render sort-published radio")
+	}
+	if !strings.Contains(body, `name="sort" id="sort-hidden"`) {
+		t.Error("page should render hidden sort input")
+	}
+}
+
+func TestArticleListNoSortControlOnInbox(t *testing.T) {
+	srv := createTestServer(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/articles?filter=unread", nil)
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if strings.Contains(body, `class="sort-toggle"`) {
+		t.Error("inbox page should not render sort control")
+	}
+}
