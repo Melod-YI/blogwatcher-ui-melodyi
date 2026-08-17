@@ -520,3 +520,25 @@ func createTestServer(t *testing.T) http.Handler {
 
 	return srv
 }
+
+func TestParseSearchOptionsSortDefaults(t *testing.T) {
+	cases := []struct {
+		query string
+		want  string
+	}{
+		{"/articles?filter=favorites", model.SortFavorited},
+		{"/articles?filter=read", model.SortRead},
+		{"/articles", model.SortPublished},
+		{"/articles?filter=unread", model.SortPublished},
+		// 显式 sort 覆盖默认
+		{"/articles?filter=favorites&sort=published", model.SortPublished},
+		{"/articles?filter=read&sort=favorited", model.SortFavorited},
+	}
+	for _, c := range cases {
+		req := httptest.NewRequest(http.MethodGet, c.query, nil)
+		opts, _, _ := parseSearchOptions(req)
+		if opts.Sort != c.want {
+			t.Errorf("query=%s: Sort=%q want %q", c.query, opts.Sort, c.want)
+		}
+	}
+}

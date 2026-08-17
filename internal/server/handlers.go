@@ -78,6 +78,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		"ArticleCount":    articleCount,
 		"DisplayedCount":  displayedCount,
 		"CurrentFilter":   filter,
+		"CurrentSort":     opts.Sort,
 		"CurrentBlogID":   currentBlogID, // 0 means no blog filter active
 		"CurrentBlogName": s.blogNameForID(currentBlogID),
 		"SearchQuery":     opts.SearchQuery,
@@ -119,6 +120,7 @@ func (s *Server) handleArticleList(w http.ResponseWriter, r *http.Request) {
 		"ArticleCount":    articleCount,
 		"DisplayedCount":  displayedCount,
 		"CurrentFilter":   filter,
+		"CurrentSort":     opts.Sort,
 		"CurrentBlogID":   currentBlogID, // 0 means no blog filter active
 		"CurrentBlogName": s.blogNameForID(currentBlogID),
 		"SearchQuery":     opts.SearchQuery,
@@ -415,6 +417,7 @@ func (s *Server) handleMarkAllRead(w http.ResponseWriter, r *http.Request) {
 		"Articles":        articles,
 		"ArticleCount":    articleCount,
 		"CurrentFilter":   filter,
+		"CurrentSort":     opts.Sort,
 		"CurrentBlogID":   currentBlogID,
 		"CurrentBlogName": s.blogNameForID(currentBlogID),
 		"SearchQuery":     opts.SearchQuery,
@@ -470,6 +473,7 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 		"Articles":        articles,
 		"ArticleCount":    articleCount,
 		"CurrentFilter":   filter,
+		"CurrentSort":     opts.Sort,
 		"CurrentBlogID":   currentBlogID,
 		"CurrentBlogName": s.blogNameForID(currentBlogID),
 		"SearchQuery":     opts.SearchQuery,
@@ -611,6 +615,22 @@ func parseSearchOptions(r *http.Request) (model.SearchOptions, string, int64) {
 		isRead := false
 		opts.IsRead = &isRead
 		filter = "unread"
+	}
+
+	// Parse sort (default depends on filter)
+	sortParam := r.URL.Query().Get("sort")
+	switch sortParam {
+	case model.SortFavorited, model.SortRead, model.SortPublished:
+		opts.Sort = sortParam
+	default:
+		switch filter {
+		case "favorites":
+			opts.Sort = model.SortFavorited
+		case "read":
+			opts.Sort = model.SortRead
+		default:
+			opts.Sort = model.SortPublished
+		}
 	}
 
 	// Parse blog filter
