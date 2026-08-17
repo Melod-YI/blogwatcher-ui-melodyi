@@ -735,7 +735,16 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 		query.WriteString(strings.Join(conditions, " AND "))
 	}
 
-	query.WriteString(" ORDER BY COALESCE(a.published_date, a.discovered_date) DESC")
+	var orderBy string
+	switch opts.Sort {
+	case model.SortFavorited:
+		orderBy = "COALESCE(a.favorited_at, a.discovered_date) DESC"
+	case model.SortRead:
+		orderBy = "COALESCE(a.read_at, a.discovered_date) DESC"
+	default:
+		orderBy = "COALESCE(a.published_date, a.discovered_date) DESC"
+	}
+	query.WriteString(" ORDER BY " + orderBy)
 
 	// Add pagination
 	limit := opts.Limit

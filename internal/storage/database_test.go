@@ -960,3 +960,87 @@ func TestMarkAllUnreadArticlesReadSetsReadAt(t *testing.T) {
 		}
 	}
 }
+
+func TestSearchArticlesSortByFavorited(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+
+	// 两个收藏文章的 favorited_at 顺序与 discovered 相反，以验证排序按 favorited_at 而非 discovered_date
+	d1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	d2 := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	d3 := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)
+	favLate := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	favEarly := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+
+	arts := []model.Article{
+		{BlogID: blog.ID, Title: "no-fav", URL: "https://example.com/1", DiscoveredDate: &d1, HNStatus: model.HNStatusNotSearch},
+		// fav-early: discovered 最新(d3) 但 favorited_at 较早(favEarly)；fav-late: discovered 较旧(d2) 但 favorited_at 较晚(favLate)
+		{BlogID: blog.ID, Title: "fav-early", URL: "https://example.com/2", DiscoveredDate: &d3, HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "fav-late", URL: "https://example.com/3", DiscoveredDate: &d2, HNStatus: model.HNStatusNotSearch},
+	}
+	if _, _, err := db.AddArticlesBulk(arts); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	all, _ := db.ListArticles(false, nil)
+	idMap := map[string]int64{}
+	for _, a := range all {
+		idMap[a.Title] = a.ID
+	}
+	db.conn.Exec(`UPDATE articles SET is_favorited=1, favorited_at=? WHERE id=?`, favEarly.Format(time.RFC3339Nano), idMap["fav-early"])
+	db.conn.Exec(`UPDATE articles SET is_favorited=1, favorited_at=? WHERE id=?`, favLate.Format(time.RFC3339Nano), idMap["fav-late"])
+
+	isFav := true
+	res, _, err := db.SearchArticles(model.SearchOptions{IsFavorited: &isFav, Sort: model.SortFavorited})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("expected 2 favorited, got %d", len(res))
+	}
+	if res[0].Title != "fav-late" || res[1].Title != "fav-early" {
+		t.Errorf("order = %s, %s; want fav-late, fav-early", res[0].Title, res[1].Title)
+	}
+}
+
+func TestSearchArticlesSortByReadWithNullFallback(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+
+	d1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	d2 := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	readLate := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	// read-set 的 discovered(d1) 较旧，但 read_at=readLate 最新；read-null 的 discovered(d2) 较新，read_at NULL 回退到 d2
+	arts := []model.Article{
+		{BlogID: blog.ID, Title: "read-null", URL: "https://example.com/1", DiscoveredDate: &d2, HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "read-set", URL: "https://example.com/2", DiscoveredDate: &d1, HNStatus: model.HNStatusNotSearch},
+	}
+	if _, _, err := db.AddArticlesBulk(arts); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	all, _ := db.ListArticles(false, nil)
+	for _, a := range all {
+		if a.Title == "read-set" {
+			db.conn.Exec(`UPDATE articles SET is_read=1, read_at=? WHERE id=?`, readLate.Format(time.RFC3339Nano), a.ID)
+		} else {
+			db.conn.Exec(`UPDATE articles SET is_read=1 WHERE id=?`, a.ID) // read_at stays NULL
+		}
+	}
+
+	isRead := true
+	res, _, err := db.SearchArticles(model.SearchOptions{IsRead: &isRead, Sort: model.SortRead})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("expected 2 read, got %d", len(res))
+	}
+	// read-set has read_at=readLate (newest) -> first; read-null falls back to d1 (older) -> second
+	if res[0].Title != "read-set" || res[1].Title != "read-null" {
+		t.Errorf("order = %s, %s; want read-set, read-null", res[0].Title, res[1].Title)
+	}
+}
