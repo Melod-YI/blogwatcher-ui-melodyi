@@ -871,3 +871,36 @@ func TestScanReadsFavoritedAtAndReadAt(t *testing.T) {
 		t.Errorf("SearchArticles ReadAt = %v", res[0].ReadAt)
 	}
 }
+
+func TestFavoriteArticleSetsFavoritedAt(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+	if _, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A", URL: "https://example.com/a", HNStatus: model.HNStatusNotSearch},
+	}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	all, _ := db.ListArticles(false, nil)
+	id := all[0].ID
+
+	if err := db.FavoriteArticle(id); err != nil {
+		t.Fatalf("favorite: %v", err)
+	}
+	a, _ := db.GetArticleByID(id)
+	if a.FavoritedAt == nil {
+		t.Fatal("expected favorited_at to be set after favorite")
+	}
+
+	if err := db.UnfavoriteArticle(id); err != nil {
+		t.Fatalf("unfavorite: %v", err)
+	}
+	a, _ = db.GetArticleByID(id)
+	if a.FavoritedAt != nil {
+		t.Fatalf("expected favorited_at to be nil after unfavorite, got %v", a.FavoritedAt)
+	}
+	if a.IsFavorited {
+		t.Fatal("expected is_favorited=false after unfavorite")
+	}
+}
