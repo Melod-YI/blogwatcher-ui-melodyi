@@ -1,0 +1,14 @@
+{{define "tags-list.gohtml"}}
+{{range .Tags}}
+<a href="/articles?filter=tag&tag={{.Name}}"
+   hx-get="/articles?filter=tag&tag={{.Name}}"
+   hx-target="#main-content"
+   hx-push-url="true"
+   class="nav-link tag-nav{{if eq $.CurrentTag .Name}} active{{end}}">
+    <span>#{{.Name}}</span>
+    <span class="tag-nav-count">{{.ArticleCount}}</span>
+</a>
+{{else}}
+<div class="tags-empty-hint">暂无标签</div>
+{{end}}
+{{end}}

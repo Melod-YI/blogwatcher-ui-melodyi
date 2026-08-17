@@ -535,3 +535,76 @@ func TestParseSearchOptions_TagFilter(t *testing.T) {
 		t.Fatalf("IsRead should be nil for tag filter, got %v", *opts.IsRead)
 	}
 }
+
+func TestHandleTagCreate(t *testing.T) {
+	srv := createTestServer(t)
+	body := strings.NewReader("name=Go")
+	req := httptest.NewRequest(http.MethodPost, "/tags", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	db := srv.(*Server).db
+	tag, err := db.GetTagByName("Go")
+	if err != nil || tag == nil {
+		t.Fatalf("tag not persisted: %v", err)
+	}
+}
+
+func TestHandleTagRename(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+	tag, _ := db.CreateTag("old")
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/tags/%d", tag.ID), strings.NewReader("name=new"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("rename: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	got, _ := db.GetTagByID(tag.ID)
+	if got.Name != "new" {
+		t.Fatalf("expected 'new', got %q", got.Name)
+	}
+}
+
+func TestHandleTagRename_Conflict(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+	a, _ := db.CreateTag("a")
+	db.CreateTag("b")
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/tags/%d", a.ID), strings.NewReader("name=b"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", rec.Code)
+	}
+}
+
+func TestHandleTagDelete(t *testing.T) {
+	srv := createTestServer(t)
+	db := srv.(*Server).db
+	tag, _ := db.CreateTag("tmp")
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/tags/%d", tag.ID), nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete: status=%d", rec.Code)
+	}
+	if got, _ := db.GetTagByID(tag.ID); got != nil {
+		t.Fatal("tag should be deleted")
+	}
+}
+
+func TestHandleTagDelete_NotFound(t *testing.T) {
+	srv := createTestServer(t)
+	req := httptest.NewRequest(http.MethodDelete, "/tags/99999", nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}

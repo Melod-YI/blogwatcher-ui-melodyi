@@ -1405,3 +1405,100 @@ func validateURL(urlStr string) error {
 	}
 	return nil
 }
+
+// handleTagsPage 渲染全局标签管理页。
+func (s *Server) handleTagsPage(w http.ResponseWriter, r *http.Request) {
+	tags, err := s.db.ListTags()
+	if err != nil {
+		log.Printf("Error listing tags: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	data := map[string]interface{}{
+		"Tags": tags,
+	}
+	s.renderTemplate(w, "tags.gohtml", data)
+}
+
+// handleTagsListPartial 渲染标签列表片段（侧边栏 Tags 分区 / 工具栏下拉用，HTMX）。
+func (s *Server) handleTagsListPartial(w http.ResponseWriter, r *http.Request) {
+	tags, err := s.db.ListTags()
+	if err != nil {
+		log.Printf("Error listing tags partial: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	data := map[string]interface{}{
+		"Tags":       tags,
+		"CurrentTag": r.URL.Query().Get("tag"),
+	}
+	s.renderTemplate(w, "tags-list.gohtml", data)
+}
+
+// handleTagCreate 创建标签并重渲染管理页。
+func (s *Server) handleTagCreate(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" || len(name) > 50 {
+		http.Error(w, "Invalid tag name", http.StatusBadRequest)
+		return
+	}
+	if _, err := s.db.CreateTag(name); err != nil {
+		log.Printf("Error creating tag '%s': %v", name, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Created tag '%s'", name)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	s.handleTagsPage(w, r)
+}
+
+// handleTagRename 重命名标签。
+func (s *Server) handleTagRename(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" || len(name) > 50 {
+		http.Error(w, "Invalid tag name", http.StatusBadRequest)
+		return
+	}
+	if err := s.db.RenameTag(id, name); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") || strings.Contains(err.Error(), "constraint") {
+			http.Error(w, "Tag name already exists", http.StatusConflict)
+			return
+		}
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Tag not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error renaming tag %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Renamed tag %d to '%s'", id, name)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	s.handleTagsPage(w, r)
+}
+
+// handleTagDelete 删除标签（级联解除关联）。
+func (s *Server) handleTagDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+		return
+	}
+	if _, err := s.db.DeleteTag(id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Tag not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error deleting tag %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Deleted tag %d", id)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	s.handleTagsPage(w, r)
+}
