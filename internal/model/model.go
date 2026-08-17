@@ -53,6 +53,7 @@ type ArticleWithBlog struct {
 	IsFavorited    bool // 文章收藏状态
 	HNURL          string   // Hacker News 讨论链接
 	HNStatus       HNStatus // HN 链接搜索状态
+	Tags           []Tag    // 文章标签，列表渲染时由批量查询装配
 }
 
 // SearchOptions contains all filter parameters for article search.
@@ -66,6 +67,7 @@ type SearchOptions struct {
 	DateTo      *time.Time // nil = no upper bound
 	Limit       int        // 0 = use default (20)
 	Offset      int        // 0 = start from beginning
+	TagName     string     // 空字符串 = 不按标签筛选；非空 = 该标签下的文章
 }
 
 // DefaultPageSize is the default number of articles per page.
@@ -81,3 +83,11 @@ const (
 	HNStatusNotFound  HNStatus = "not_found"    // 搜索无结果
 	HNStatusFailed    HNStatus = "failed"       // 搜索失败
 )
+
+// Tag 表示一个用户自定义标签，用于对文章标注与分类。
+type Tag struct {
+	ID           int64
+	Name         string
+	CreatedAt    time.Time
+	ArticleCount int64 // 仅 ListTags 时填充，其余方法为 0
+}

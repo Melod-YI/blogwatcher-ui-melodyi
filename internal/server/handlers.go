@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/processor"
@@ -71,6 +72,15 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	nextOffset := opts.Offset + len(articles)
 	displayedCount := opts.Offset + len(articles)
 
+	// 标签：当前选中标签（用于侧边栏高亮 hx-vals / 工具栏下拉 selected）
+	currentTag := r.URL.Query().Get("tag")
+	// 工具栏标签下拉选项；查询失败静默置空，不影响列表渲染
+	allTags, err := s.db.ListTags()
+	if err != nil {
+		log.Printf("Error listing tags for article list: %v", err)
+		allTags = nil
+	}
+
 	data := map[string]interface{}{
 		"Title":           "BlogWatcher",
 		"Blogs":           blogs,
@@ -83,6 +93,8 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		"SearchQuery":     opts.SearchQuery,
 		"DateFrom":        r.URL.Query().Get("date_from"),
 		"DateTo":          r.URL.Query().Get("date_to"),
+		"CurrentTag":      currentTag,
+		"AllTags":         allTags,
 		"Version":         s.version,
 		"HasMore":         hasMore,
 		"NextOffset":      nextOffset,
@@ -114,6 +126,14 @@ func (s *Server) handleArticleList(w http.ResponseWriter, r *http.Request) {
 	nextOffset := opts.Offset + len(articles)
 	displayedCount := opts.Offset + len(articles)
 
+	// 标签：当前选中标签（侧边栏高亮 / 工具栏下拉 selected）+ 全部标签（下拉选项）
+	currentTag := r.URL.Query().Get("tag")
+	allTags, tagErr := s.db.ListTags()
+	if tagErr != nil {
+		log.Printf("Error listing tags for article list: %v", tagErr)
+		allTags = nil
+	}
+
 	data := map[string]interface{}{
 		"Articles":        articles,
 		"ArticleCount":    articleCount,
@@ -124,6 +144,8 @@ func (s *Server) handleArticleList(w http.ResponseWriter, r *http.Request) {
 		"SearchQuery":     opts.SearchQuery,
 		"DateFrom":        r.URL.Query().Get("date_from"),
 		"DateTo":          r.URL.Query().Get("date_to"),
+		"CurrentTag":      currentTag,
+		"AllTags":         allTags,
 		"HasMore":         hasMore,
 		"NextOffset":      nextOffset,
 		"IsLoadMore":      opts.Offset > 0,
@@ -374,6 +396,13 @@ func (s *Server) renderUpdatedArticleCard(w http.ResponseWriter, id int64) {
 		BlogURL:        blog.URL,
 	}
 
+	// 装配标签用于卡片 chips 渲染
+	if tags, err := s.db.GetArticleTags(id); err == nil {
+		articleWithBlog.Tags = tags
+	} else {
+		log.Printf("Error fetching tags for article %d: %v", id, err)
+	}
+
 	data := map[string]interface{}{
 		"Articles":       []model.ArticleWithBlog{articleWithBlog},
 		"DisplayedCount": 0,
@@ -607,6 +636,9 @@ func parseSearchOptions(r *http.Request) (model.SearchOptions, string, int64) {
 		opts.IsFavorited = &isFav
 		// Don't set IsRead filter — show both read and unread favorited articles
 		opts.IsRead = nil
+	case "tag":
+		opts.TagName = r.URL.Query().Get("tag")
+		opts.IsRead = nil // 标签筛选不强制已读状态
 	default:
 		isRead := false
 		opts.IsRead = &isRead
@@ -1396,4 +1428,254 @@ func validateURL(urlStr string) error {
 		return fmt.Errorf("URL 必须包含主机名")
 	}
 	return nil
+}
+
+// handleTagsPage 渲染全局标签管理页。
+func (s *Server) handleTagsPage(w http.ResponseWriter, r *http.Request) {
+	tags, err := s.db.ListTags()
+	if err != nil {
+		log.Printf("Error listing tags: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	data := map[string]interface{}{
+		"Tags": tags,
+	}
+	s.renderTemplate(w, "tags.gohtml", data)
+}
+
+// renderTagsContent 渲染 .tags-content 片段，供 create/rename/delete 成功后返回。
+// 形状与模板里 hx-target=".tags-content" hx-swap="innerHTML" 匹配，避免整页注入子区。
+func (s *Server) renderTagsContent(w http.ResponseWriter) {
+	tags, err := s.db.ListTags()
+	if err != nil {
+		log.Printf("Error listing tags for partial: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	s.renderTemplate(w, "tags-content.gohtml", map[string]interface{}{"Tags": tags})
+}
+
+// handleTagsListPartial 渲染标签列表片段（侧边栏 Tags 分区 / 工具栏下拉用，HTMX）。
+func (s *Server) handleTagsListPartial(w http.ResponseWriter, r *http.Request) {
+	tags, err := s.db.ListTags()
+	if err != nil {
+		log.Printf("Error listing tags partial: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	data := map[string]interface{}{
+		"Tags":       tags,
+		"CurrentTag": r.URL.Query().Get("tag"),
+	}
+	s.renderTemplate(w, "tags-list.gohtml", data)
+}
+
+// handleTagCreate 创建标签并重渲染管理页。
+func (s *Server) handleTagCreate(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" || utf8.RuneCountInString(name) > 50 {
+		http.Error(w, "Invalid tag name", http.StatusBadRequest)
+		return
+	}
+	if _, err := s.db.CreateTag(name); err != nil {
+		log.Printf("Error creating tag '%s': %v", name, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Created tag '%s'", name)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	s.renderTagsContent(w)
+}
+
+// handleTagRename 重命名标签。
+func (s *Server) handleTagRename(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" || utf8.RuneCountInString(name) > 50 {
+		http.Error(w, "Invalid tag name", http.StatusBadRequest)
+		return
+	}
+	if err := s.db.RenameTag(id, name); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") || strings.Contains(err.Error(), "constraint") {
+			http.Error(w, "Tag name already exists", http.StatusConflict)
+			return
+		}
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Tag not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error renaming tag %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Renamed tag %d to '%s'", id, name)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	s.renderTagsContent(w)
+}
+
+// handleTagDelete 删除标签（级联解除关联）。
+func (s *Server) handleTagDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+		return
+	}
+	if _, err := s.db.DeleteTag(id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Tag not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error deleting tag %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Deleted tag %d", id)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	s.renderTagsContent(w)
+}
+
+// handleArticleTagsPage 渲染单文标签管理页（整页导航）。
+func (s *Server) handleArticleTagsPage(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	article, err := s.db.GetArticleByID(id)
+	if err != nil {
+		log.Printf("Error fetching article %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if article == nil {
+		http.Error(w, "Article not found", http.StatusNotFound)
+		return
+	}
+	data := s.buildArticleTagsData(id)
+	data["Title"] = article.Title
+	data["URL"] = article.URL
+	log.Printf("Article tags page for article %d", id)
+	s.renderTemplate(w, "article-tags.gohtml", data)
+}
+
+// handleArticleTagsEditPartial 渲染卡片弹层片段（HTMX，无整页）。
+func (s *Server) handleArticleTagsEditPartial(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	data := s.buildArticleTagsData(id)
+	s.renderTemplate(w, "article-tags-edit.gohtml", data)
+}
+
+// handleArticleTagAdd 增量加标签（name，不存在自动建），成功后重渲染弹层片段。
+func (s *Server) handleArticleTagAdd(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" || utf8.RuneCountInString(name) > 50 {
+		http.Error(w, "Invalid tag name", http.StatusBadRequest)
+		return
+	}
+	article, err := s.db.GetArticleByID(id)
+	if err != nil {
+		log.Printf("Error fetching article %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if article == nil {
+		http.Error(w, "Article not found", http.StatusNotFound)
+		return
+	}
+	tag, err := s.db.CreateTag(name)
+	if err != nil {
+		log.Printf("Error creating tag '%s': %v", name, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if err := s.db.AddArticleTag(id, tag.ID); err != nil {
+		log.Printf("Error adding tag %d to article %d: %v", tag.ID, id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Added tag '%s' (id=%d) to article %d", name, tag.ID, id)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	data := s.buildArticleTagsData(id)
+	s.renderTemplate(w, "article-tags-edit.gohtml", data)
+}
+
+// handleArticleTagRemove 增量移除标签，成功后重渲染弹层片段。
+func (s *Server) handleArticleTagRemove(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	tagID, err := strconv.ParseInt(r.PathValue("tagID"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+		return
+	}
+	if err := s.db.RemoveArticleTag(id, tagID); err != nil {
+		log.Printf("Error removing tag %d from article %d: %v", tagID, id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Removed tag %d from article %d", tagID, id)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	data := s.buildArticleTagsData(id)
+	s.renderTemplate(w, "article-tags-edit.gohtml", data)
+}
+
+// handleArticleTagSave 全量替换文章标签，成功后渲染管理页 chips 区片段。
+func (s *Server) handleArticleTagSave(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid article ID", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+	var tagIDs []int64
+	for _, raw := range r.Form["tag_ids"] {
+		if tid, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			tagIDs = append(tagIDs, tid)
+		}
+	}
+	if err := s.db.SetArticleTags(id, tagIDs); err != nil {
+		log.Printf("Error saving tags for article %d: %v", id, err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Saved %d tags for article %d", len(tagIDs), id)
+	w.Header().Set("HX-Trigger", "articleListUpdated")
+	data := s.buildArticleTagsData(id)
+	s.renderTemplate(w, "article-tags-content.gohtml", data)
+}
+
+// buildArticleTagsData 构造标签管理所需公共数据：AllTags、Current、CurrentIDs。
+func (s *Server) buildArticleTagsData(id int64) map[string]interface{} {
+	allTags, _ := s.db.ListTags()
+	current, _ := s.db.GetArticleTags(id)
+	currentIDs := map[int64]bool{}
+	for _, t := range current {
+		currentIDs[t.ID] = true
+	}
+	return map[string]interface{}{
+		"ID":         id,
+		"AllTags":    allTags,
+		"Current":    current,
+		"CurrentIDs": currentIDs,
+	}
 }

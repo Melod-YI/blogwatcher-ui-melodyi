@@ -35,11 +35,22 @@ func FormatSimple(articles []model.ArticleWithBlog, meta PaginationMeta) string 
 			favMark = " ★"
 		}
 
+		// 标签后缀（#tag1 #tag2）
+		tagMark := ""
+		if len(article.Tags) > 0 {
+			parts := make([]string, len(article.Tags))
+			for i, tag := range article.Tags {
+				parts[i] = "#" + tag.Name
+			}
+			tagMark = " " + strings.Join(parts, " ")
+		}
+
 		// 构建行
-		line := fmt.Sprintf("%s %s%s (%s) - %s",
+		line := fmt.Sprintf("%s %s%s%s (%s) - %s",
 			status,
 			article.Title,
 			favMark,
+			tagMark,
 			article.BlogName,
 			published)
 

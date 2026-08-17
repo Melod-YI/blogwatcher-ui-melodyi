@@ -38,6 +38,8 @@ func init() {
 	rootCmd.AddCommand(NewNoteCmd())
 	// 添加 category 子命令
 	rootCmd.AddCommand(NewCategoryCmd())
+	// 添加 tag 子命令
+	rootCmd.AddCommand(NewTagCmd())
 	// 添加 hn 子命令
 	rootCmd.AddCommand(NewHNCmd())
 }

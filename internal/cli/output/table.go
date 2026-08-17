@@ -11,8 +11,8 @@ import (
 )
 
 // FormatTable 将文章列表格式化为表格输出
-// 表头：ID、Title、Blog、Status、Published
-// 标题截断到 50 字符，状态使用中文显示
+// 表头：ID、Title、Blog、Status、Fav、Tags、Published
+// 标题截断到 50 字符，状态使用中文显示，标签逗号拼接后截断
 // 最后显示分页信息
 func FormatTable(articles []model.ArticleWithBlog, meta PaginationMeta) string {
 	if len(articles) == 0 {
@@ -25,24 +25,27 @@ func FormatTable(articles []model.ArticleWithBlog, meta PaginationMeta) string {
 	blogWidth := 20
 	statusWidth := 8
 	favWidth := 5
+	tagWidth := 18
 	timeWidth := 20
 
 	// 构建表头
-	header := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |",
+	header := fmt.Sprintf("| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |",
 		idWidth, "ID",
 		titleWidth, "Title",
 		blogWidth, "Blog",
 		statusWidth, "Status",
 		favWidth, "Fav",
+		tagWidth, "Tags",
 		timeWidth, "Published")
 
 	// 构建分隔线
-	separator := fmt.Sprintf("|-%s-|-%s-|-%s-|-%s-|-%s-|-%s-|",
+	separator := fmt.Sprintf("|-%s-|-%s-|-%s-|-%s-|-%s-|-%s-|-%s-|",
 		strings.Repeat("-", idWidth),
 		strings.Repeat("-", titleWidth),
 		strings.Repeat("-", blogWidth),
 		strings.Repeat("-", statusWidth),
 		strings.Repeat("-", favWidth),
+		strings.Repeat("-", tagWidth),
 		strings.Repeat("-", timeWidth))
 
 	// 构建各行
@@ -69,15 +72,26 @@ func FormatTable(articles []model.ArticleWithBlog, meta PaginationMeta) string {
 			fav = "★"
 		}
 
+		// 标签（逗号拼接后截断）
+		tags := ""
+		if len(article.Tags) > 0 {
+			names := make([]string, len(article.Tags))
+			for i, tag := range article.Tags {
+				names[i] = tag.Name
+			}
+			tags = truncate(strings.Join(names, ","), tagWidth)
+		}
+
 		// 时间（相对时间或日期）
 		published := formatTime(article.PublishedDate, article.DiscoveredDate)
 
-		row := fmt.Sprintf("| %-*d | %-*s | %-*s | %-*s | %-*s | %-*s |",
+		row := fmt.Sprintf("| %-*d | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |",
 			idWidth, article.ID,
 			titleWidth, title,
 			blogWidth, blogName,
 			statusWidth, status,
 			favWidth, fav,
+			tagWidth, tags,
 			timeWidth, published)
 
 		rows = append(rows, row)

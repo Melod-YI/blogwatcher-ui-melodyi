@@ -1,0 +1,33 @@
+{{define "tags.gohtml"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#FAF8F5" media="(prefers-color-scheme: light)">
+    <script>
+    (function() {
+      var theme = localStorage.getItem('theme') || 'system';
+      var isDark = theme === 'dark' ||
+        (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+    </script>
+    <title>标签管理 - BlogWatcher</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="tags-page">
+        <header class="tags-header">
+            <h1>标签管理</h1>
+        </header>
+        <main>
+            {{template "tags-content.gohtml" .}}
+        </main>
+    </div>
+</body>
+</html>
+{{end}}

@@ -209,6 +209,29 @@ func (db *Database) ensureMigrations() error {
 		}
 	}
 
+	// Create tags table if it doesn't exist
+	if !db.tableExists("tags") {
+		if _, err := db.conn.Exec(`CREATE TABLE IF NOT EXISTS tags (
+			id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`); err != nil {
+			return fmt.Errorf("failed to create tags table: %w", err)
+		}
+	}
+
+	// Create article_tags join table if it doesn't exist
+	if !db.tableExists("article_tags") {
+		if _, err := db.conn.Exec(`CREATE TABLE IF NOT EXISTS article_tags (
+			tag_id INTEGER NOT NULL,
+			article_id INTEGER NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (tag_id, article_id)
+		)`); err != nil {
+			return fmt.Errorf("failed to create article_tags table: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -702,6 +725,12 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 		args = append(args, *opts.BlogID)
 	}
 
+	// 标签筛选（EXISTS 子查询）
+	if opts.TagName != "" {
+		conditions = append(conditions, `EXISTS(SELECT 1 FROM article_tags at JOIN tags t ON t.id=at.tag_id WHERE at.article_id=a.id AND t.name=?)`)
+		args = append(args, opts.TagName)
+	}
+
 	// Add date range using COALESCE for published_date fallback to discovered_date
 	if opts.DateFrom != nil {
 		conditions = append(conditions, "COALESCE(a.published_date, a.discovered_date) >= ?")
@@ -753,6 +782,21 @@ func (db *Database) SearchArticles(opts model.SearchOptions) ([]model.ArticleWit
 
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
+	}
+
+	// 批量装配标签，避免 N+1
+	if len(articles) > 0 {
+		ids := make([]int64, len(articles))
+		for i, a := range articles {
+			ids[i] = a.ID
+		}
+		tagMap, err := db.GetTagsForArticles(ids)
+		if err != nil {
+			return nil, 0, err
+		}
+		for i := range articles {
+			articles[i].Tags = tagMap[articles[i].ID]
+		}
 	}
 
 	return articles, totalCount, nil
@@ -880,12 +924,21 @@ func (db *Database) GetArticleByID(id int64) (*model.Article, error) {
 
 // GetArticleWithBlogByID returns a single article joined with its blog metadata
 // (name + url), or nil if no article has the given id. Used by `article get <id>`.
+// 同时装配该文章的标签列表，供 CLI get 输出展示。
 func (db *Database) GetArticleWithBlogByID(id int64) (*model.ArticleWithBlog, error) {
 	row := db.conn.QueryRow(`SELECT a.id, a.blog_id, a.title, a.url, a.thumbnail_url, a.published_date, a.discovered_date, a.is_read, a.has_note, a.hn_url, a.hn_status, b.name, b.url, a.is_favorited
 		FROM articles a
 		INNER JOIN blogs b ON a.blog_id = b.id
 		WHERE a.id = ?`, id)
-	return scanArticleWithBlog(row)
+	article, err := scanArticleWithBlog(row)
+	if err != nil || article == nil {
+		return article, err
+	}
+	// 装配标签（取标签失败不阻断查询，仅留空）
+	if tags, terr := db.GetArticleTags(id); terr == nil {
+		article.Tags = tags
+	}
+	return article, nil
 }
 
 // GetBlogByURL returns a blog by its URL, or nil if not found.
@@ -1461,6 +1514,7 @@ type ListFilterOptions struct {
 	SearchQuery   string     // 标题全文搜索关键词（空表示不触发 FTS5）
 	Limit         int        // 结果数量限制（0 表示无限制）
 	Offset        int        // 结果偏移量（用于翻页）
+	TagName       string     // 标签名称筛选（空表示不按标签筛选）
 }
 
 // ListArticlesWithFilters 根据筛选选项列出文章（带博客信息）
@@ -1475,7 +1529,7 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 	}
 	query += " WHERE 1=1"
 
-	// 构建筛选条件（与 CountArticlesWithFilters 共用 buildFilterConditions）
+	// 构建筛选条件（与 CountArticlesWithFilters 共用 buildFilterConditions，含 search 与 tag 分支）
 	conditions, args := buildFilterConditions(opts)
 
 	// 添加 WHERE 条件
@@ -1515,6 +1569,21 @@ func (db *Database) ListArticlesWithFilters(opts ListFilterOptions) ([]model.Art
 		}
 	}
 
+	// 批量装配标签，避免 N+1
+	if len(articles) > 0 {
+		ids := make([]int64, len(articles))
+		for i, a := range articles {
+			ids[i] = a.ID
+		}
+		tagMap, err := db.GetTagsForArticles(ids)
+		if err != nil {
+			return nil, err
+		}
+		for i := range articles {
+			articles[i].Tags = tagMap[articles[i].ID]
+		}
+	}
+
 	return articles, rows.Err()
 }
 
@@ -1545,6 +1614,235 @@ func (db *Database) CreateCategory(name string) (model.Category, error) {
 		Name:      name,
 		CreatedAt: now,
 	}, nil
+}
+
+// CreateTag 创建标签，重名幂等：已存在则返回现有标签。
+func (db *Database) CreateTag(name string) (model.Tag, error) {
+	if name == "" {
+		return model.Tag{}, errors.New("tag name cannot be empty")
+	}
+
+	// 先尝试插入
+	result, err := db.conn.Exec(`INSERT INTO tags (name) VALUES (?)`, name)
+	if err != nil {
+		// UNIQUE 冲突 → 回查现有
+		existing, qerr := db.GetTagByName(name)
+		if qerr != nil || existing == nil {
+			return model.Tag{}, err
+		}
+		return *existing, nil
+	}
+	id, _ := result.LastInsertId()
+	tag, err := db.GetTagByID(id)
+	if err != nil {
+		return model.Tag{}, fmt.Errorf("query created tag: %w", err)
+	}
+	if tag == nil {
+		return model.Tag{}, errors.New("tag create inconsistent: row vanished")
+	}
+	return *tag, nil
+}
+
+// GetTagByName 按名查标签，不存在返回 (nil, nil)。
+func (db *Database) GetTagByName(name string) (*model.Tag, error) {
+	row := db.conn.QueryRow(`SELECT id, name, created_at FROM tags WHERE name = ?`, name)
+	return scanTag(row)
+}
+
+// GetTagByID 按 ID 查标签，不存在返回 (nil, nil)。
+func (db *Database) GetTagByID(id int64) (*model.Tag, error) {
+	row := db.conn.QueryRow(`SELECT id, name, created_at FROM tags WHERE id = ?`, id)
+	return scanTag(row)
+}
+
+// scanTag 从单行扫描标签。
+func scanTag(row *sql.Row) (*model.Tag, error) {
+	var tag model.Tag
+	var created sql.NullString
+	if err := row.Scan(&tag.ID, &tag.Name, &created); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if created.Valid {
+		if parsed, err := parseTime(created.String); err == nil {
+			tag.CreatedAt = parsed
+		}
+	}
+	return &tag, nil
+}
+
+// ListTags 列出所有标签及关联文章计数，按名称排序。
+func (db *Database) ListTags() ([]model.Tag, error) {
+	rows, err := db.conn.Query(`SELECT t.id, t.name, t.created_at, COUNT(at.article_id) AS cnt
+		FROM tags t
+		LEFT JOIN article_tags at ON at.tag_id = t.id
+		GROUP BY t.id
+		ORDER BY t.name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []model.Tag
+	for rows.Next() {
+		var tag model.Tag
+		var created sql.NullString
+		if err := rows.Scan(&tag.ID, &tag.Name, &created, &tag.ArticleCount); err != nil {
+			return nil, err
+		}
+		if created.Valid {
+			if parsed, err := parseTime(created.String); err == nil {
+				tag.CreatedAt = parsed
+			}
+		}
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
+// RenameTag 重命名标签。新名与现有标签撞名时返回错误。
+func (db *Database) RenameTag(id int64, newName string) error {
+	if newName == "" {
+		return errors.New("tag name cannot be empty")
+	}
+	result, err := db.conn.Exec(`UPDATE tags SET name = ? WHERE id = ?`, newName, id)
+	if err != nil {
+		return fmt.Errorf("failed to rename tag: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("tag not found: %d", id)
+	}
+	return nil
+}
+
+// DeleteTag 删除标签，事务内先解除所有文章关联再删除标签本身。
+// 返回被删除的关联行数。
+func (db *Database) DeleteTag(id int64) (int64, error) {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`DELETE FROM article_tags WHERE tag_id = ?`, id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to clear tag associations: %w", err)
+	}
+	affected, _ := res.RowsAffected()
+
+	res, err = tx.Exec(`DELETE FROM tags WHERE id = ?`, id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete tag: %w", err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return 0, fmt.Errorf("tag not found: %d", id)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return affected, nil
+}
+
+// AddArticleTag 给文章加标签，幂等（INSERT OR IGNORE）。
+func (db *Database) AddArticleTag(articleID, tagID int64) error {
+	_, err := db.conn.Exec(`INSERT OR IGNORE INTO article_tags (tag_id, article_id) VALUES (?, ?)`, tagID, articleID)
+	return err
+}
+
+// RemoveArticleTag 移除文章标签关联，无影响行也算成功。
+func (db *Database) RemoveArticleTag(articleID, tagID int64) error {
+	_, err := db.conn.Exec(`DELETE FROM article_tags WHERE tag_id = ? AND article_id = ?`, tagID, articleID)
+	return err
+}
+
+// SetArticleTags 全量替换文章标签：事务内删旧关联、插新关联。
+func (db *Database) SetArticleTags(articleID int64, tagIDs []int64) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM article_tags WHERE article_id = ?`, articleID); err != nil {
+		return fmt.Errorf("failed to clear article tags: %w", err)
+	}
+	for _, tid := range tagIDs {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO article_tags (tag_id, article_id) VALUES (?, ?)`, tid, articleID); err != nil {
+			return fmt.Errorf("failed to insert article tag: %w", err)
+		}
+	}
+	return tx.Commit()
+}
+
+// GetArticleTags 取单篇文章的所有标签。
+func (db *Database) GetArticleTags(articleID int64) ([]model.Tag, error) {
+	rows, err := db.conn.Query(`SELECT t.id, t.name, t.created_at FROM tags t
+		INNER JOIN article_tags at ON at.tag_id = t.id
+		WHERE at.article_id = ? ORDER BY t.name`, articleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []model.Tag
+	for rows.Next() {
+		var tag model.Tag
+		var created sql.NullString
+		if err := rows.Scan(&tag.ID, &tag.Name, &created); err != nil {
+			return nil, err
+		}
+		if created.Valid {
+			if parsed, err := parseTime(created.String); err == nil {
+				tag.CreatedAt = parsed
+			}
+		}
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
+// GetTagsForArticles 批量取多文章的标签，按 article_id 聚合，避免列表渲染 N+1。
+// 返回 map[articleID][]Tag。空入参返回空 map。
+func (db *Database) GetTagsForArticles(articleIDs []int64) (map[int64][]model.Tag, error) {
+	result := map[int64][]model.Tag{}
+	if len(articleIDs) == 0 {
+		return result, nil
+	}
+	placeholders := make([]string, len(articleIDs))
+	args := make([]interface{}, len(articleIDs))
+	for i, id := range articleIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	query := fmt.Sprintf(`SELECT at.article_id, t.id, t.name, t.created_at FROM tags t
+		INNER JOIN article_tags at ON at.tag_id = t.id
+		WHERE at.article_id IN (%s) ORDER BY t.name`, strings.Join(placeholders, ","))
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var articleID int64
+		var tag model.Tag
+		var created sql.NullString
+		if err := rows.Scan(&articleID, &tag.ID, &tag.Name, &created); err != nil {
+			return nil, err
+		}
+		if created.Valid {
+			if parsed, err := parseTime(created.String); err == nil {
+				tag.CreatedAt = parsed
+			}
+		}
+		result[articleID] = append(result[articleID], tag)
+	}
+	return result, rows.Err()
 }
 
 // ListCategoriesWithBlogCount returns all categories with their blog counts.
@@ -1836,6 +2134,12 @@ func buildFilterConditions(opts ListFilterOptions) ([]string, []interface{}) {
 	if opts.IsFavorited != nil {
 		conditions = append(conditions, "a.is_favorited = ?")
 		args = append(args, *opts.IsFavorited)
+	}
+
+	// 标签筛选（EXISTS 子查询）
+	if opts.TagName != "" {
+		conditions = append(conditions, `EXISTS(SELECT 1 FROM article_tags at JOIN tags t ON t.id=at.tag_id WHERE at.article_id=a.id AND t.name=?)`)
+		args = append(args, opts.TagName)
 	}
 
 	// 日期筛选（使用 published_date 或 discovered_date）

@@ -67,7 +67,7 @@
                hx-get="/articles"
                hx-trigger="keyup changed delay:300ms, search"
                hx-target="#main-content"
-               hx-include="#filter-hidden, #blog-hidden, #date_from, #date_to"
+               hx-include="#filter-hidden, #blog-hidden, #date_from, #date_to, #tag-filter-select"
                hx-push-url="true">
     </div>
     <div class="date-filters">
@@ -81,7 +81,7 @@
                hx-get="/articles"
                hx-trigger="change"
                hx-target="#main-content"
-               hx-include="#filter-hidden, #blog-hidden, #search-input, #date_to"
+               hx-include="#filter-hidden, #blog-hidden, #search-input, #date_to, #tag-filter-select"
                hx-push-url="true">
         <span class="date-separator">to</span>
         <input type="date"
@@ -91,11 +91,24 @@
                hx-get="/articles"
                hx-trigger="change"
                hx-target="#main-content"
-               hx-include="#filter-hidden, #blog-hidden, #search-input, #date_from"
+               hx-include="#filter-hidden, #blog-hidden, #search-input, #date_from, #tag-filter-select"
                hx-push-url="true">
     </div>
     <input type="hidden" name="filter" id="filter-hidden" value="{{.CurrentFilter}}">
     {{if .CurrentBlogID}}<input type="hidden" name="blog" id="blog-hidden" value="{{.CurrentBlogID}}">{{end}}
+    <select name="tag"
+            id="tag-filter-select"
+            class="tag-filter-select"
+            hx-get="/articles"
+            hx-trigger="change"
+            hx-include="#filter-hidden, #blog-hidden, #search-input, #date_from, #date_to"
+            hx-target="#main-content"
+            hx-push-url="true">
+        <option value="">所有标签</option>
+        {{range .AllTags}}
+        <option value="{{.Name}}" {{if eq $.CurrentTag .Name}}selected{{end}}>#{{.Name}}</option>
+        {{end}}
+    </select>
 </div>
 <div class="results-info" id="results-info">
     {{if .Articles}}
@@ -170,9 +183,20 @@
                   data-id="{{.ID}}"
                   title="点击复制文章 ID（用于 CLI）"
                   onclick="copyArticleId(this, event)">#{{.ID}}</span>
+            {{range .Tags}}
+            <span class="tag-chip tag-chip-sm">#{{.Name}}</span>
+            {{end}}
         </div>
     </div>
     <div class="article-actions">
+        <button class="action-btn tag-btn"
+                hx-get="/articles/{{.ID}}/tags/edit"
+                hx-target="#article-{{.ID}}"
+                hx-swap="beforeend"
+                title="标签"
+                onclick="event.stopPropagation();">
+            <span class="action-btn-label">Tag</span>
+        </button>
         {{if .IsFavorited}}
         <button class="action-btn action-btn-favorite active"
                 hx-post="/articles/{{.ID}}/unfavorite"
@@ -235,7 +259,7 @@
 {{end}}
 {{if .HasMore}}
 <div id="load-more-trigger"
-     hx-get="/articles?filter={{.CurrentFilter}}{{if .CurrentBlogID}}&amp;blog={{.CurrentBlogID}}{{end}}{{if .SearchQuery}}&amp;search={{.SearchQuery}}{{end}}{{if .DateFrom}}&amp;date_from={{.DateFrom}}{{end}}{{if .DateTo}}&amp;date_to={{.DateTo}}{{end}}&amp;offset={{.NextOffset}}"
+     hx-get="/articles?filter={{.CurrentFilter}}{{if .CurrentBlogID}}&amp;blog={{.CurrentBlogID}}{{end}}{{if .SearchQuery}}&amp;search={{.SearchQuery}}{{end}}{{if .DateFrom}}&amp;date_from={{.DateFrom}}{{end}}{{if .DateTo}}&amp;date_to={{.DateTo}}{{end}}{{if .CurrentTag}}&amp;tag={{.CurrentTag}}{{end}}&amp;offset={{.NextOffset}}"
      hx-trigger="intersect once threshold:0.1"
      hx-swap="outerHTML"
      hx-indicator="#loading-indicator">

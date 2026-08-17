@@ -1,0 +1,29 @@
+{{define "tags-content.gohtml"}}
+<div class="tags-content">
+    <form class="tag-create-form" hx-post="/tags" hx-target=".tags-content" hx-swap="innerHTML">
+        <input type="text" name="name" placeholder="新标签名" maxlength="50" class="tag-name-input" required>
+        <button type="submit" class="action-btn">新建</button>
+    </form>
+    {{range .Tags}}
+    <div class="tag-row" id="tag-{{.ID}}">
+        <form class="tag-rename-form"
+              hx-put="/tags/{{.ID}}"
+              hx-target=".tags-content"
+              hx-swap="innerHTML">
+            <input type="text" name="name" value="{{.Name}}" maxlength="50" class="tag-name-input">
+            <button type="submit" class="action-btn">重命名</button>
+        </form>
+        <span class="tag-count">{{.ArticleCount}} 篇</span>
+        <button class="action-btn action-btn-danger"
+                hx-delete="/tags/{{.ID}}"
+                hx-target=".tags-content"
+                hx-swap="innerHTML"
+                hx-confirm="确认删除标签「{{.Name}}」？将解除所有关联。">
+            删除
+        </button>
+    </div>
+    {{else}}
+    <p class="tags-empty">暂无标签</p>
+    {{end}}
+</div>
+{{end}}

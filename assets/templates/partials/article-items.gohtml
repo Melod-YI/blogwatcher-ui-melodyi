@@ -49,9 +49,20 @@
                   data-id="{{.ID}}"
                   title="点击复制文章 ID（用于 CLI）"
                   onclick="copyArticleId(this, event)">#{{.ID}}</span>
+            {{range .Tags}}
+            <span class="tag-chip tag-chip-sm">#{{.Name}}</span>
+            {{end}}
         </div>
     </div>
     <div class="article-actions">
+        <button class="action-btn tag-btn"
+                hx-get="/articles/{{.ID}}/tags/edit"
+                hx-target="#article-{{.ID}}"
+                hx-swap="beforeend"
+                title="标签"
+                onclick="event.stopPropagation();">
+            <span class="action-btn-label">Tag</span>
+        </button>
         {{if .IsFavorited}}
         <button class="action-btn action-btn-favorite active"
                 hx-post="/articles/{{.ID}}/unfavorite"
@@ -114,7 +125,7 @@
 {{end}}
 {{if .HasMore}}
 <div id="load-more-trigger"
-     hx-get="/articles?filter={{.CurrentFilter}}{{if .CurrentBlogID}}&amp;blog={{.CurrentBlogID}}{{end}}{{if .SearchQuery}}&amp;search={{.SearchQuery}}{{end}}{{if .DateFrom}}&amp;date_from={{.DateFrom}}{{end}}{{if .DateTo}}&amp;date_to={{.DateTo}}{{end}}&amp;offset={{.NextOffset}}"
+     hx-get="/articles?filter={{.CurrentFilter}}{{if .CurrentBlogID}}&amp;blog={{.CurrentBlogID}}{{end}}{{if .SearchQuery}}&amp;search={{.SearchQuery}}{{end}}{{if .DateFrom}}&amp;date_from={{.DateFrom}}{{end}}{{if .DateTo}}&amp;date_to={{.DateTo}}{{end}}{{if .CurrentTag}}&amp;tag={{.CurrentTag}}{{end}}&amp;offset={{.NextOffset}}"
      hx-trigger="intersect once threshold:0.1"
      hx-swap="outerHTML"
      hx-indicator="#loading-indicator">
