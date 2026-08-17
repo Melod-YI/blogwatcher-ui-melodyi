@@ -70,6 +70,17 @@
         </a>
     </nav>
 
+    {{/* Tags section */}}
+    <div class="tags-section">
+        <div class="nav-section-title">Tags</div>
+        <div id="tag-list"
+             hx-get="/tags/list"
+             {{if .CurrentTag}}hx-vals='{"tag": "{{.CurrentTag}}"}'{{end}}
+             hx-trigger="load, articleListUpdated from:body"
+             hx-swap="innerHTML">
+        </div>
+    </div>
+
     {{/* Subscriptions / Blog list - Category grouped */}}
     <div class="subscriptions-section">
         <div class="nav-section-title">Subscriptions</div>

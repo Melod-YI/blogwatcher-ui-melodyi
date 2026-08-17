@@ -1,5 +1,6 @@
 {{define "article-tags-edit.gohtml"}}
 <div class="tag-popover" id="tag-popover-{{.ID}}">
+    <button class="tag-popover-close" onclick="this.closest('.tag-popover').remove();" title="关闭">×</button>
     <div class="tag-popover-current">
         {{range .Current}}
         <span class="tag-chip">

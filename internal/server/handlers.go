@@ -72,6 +72,15 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	nextOffset := opts.Offset + len(articles)
 	displayedCount := opts.Offset + len(articles)
 
+	// 标签：当前选中标签（用于侧边栏高亮 hx-vals / 工具栏下拉 selected）
+	currentTag := r.URL.Query().Get("tag")
+	// 工具栏标签下拉选项；查询失败静默置空，不影响列表渲染
+	allTags, err := s.db.ListTags()
+	if err != nil {
+		log.Printf("Error listing tags for article list: %v", err)
+		allTags = nil
+	}
+
 	data := map[string]interface{}{
 		"Title":           "BlogWatcher",
 		"Blogs":           blogs,
@@ -84,6 +93,8 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		"SearchQuery":     opts.SearchQuery,
 		"DateFrom":        r.URL.Query().Get("date_from"),
 		"DateTo":          r.URL.Query().Get("date_to"),
+		"CurrentTag":      currentTag,
+		"AllTags":         allTags,
 		"Version":         s.version,
 		"HasMore":         hasMore,
 		"NextOffset":      nextOffset,
@@ -115,6 +126,14 @@ func (s *Server) handleArticleList(w http.ResponseWriter, r *http.Request) {
 	nextOffset := opts.Offset + len(articles)
 	displayedCount := opts.Offset + len(articles)
 
+	// 标签：当前选中标签（侧边栏高亮 / 工具栏下拉 selected）+ 全部标签（下拉选项）
+	currentTag := r.URL.Query().Get("tag")
+	allTags, tagErr := s.db.ListTags()
+	if tagErr != nil {
+		log.Printf("Error listing tags for article list: %v", tagErr)
+		allTags = nil
+	}
+
 	data := map[string]interface{}{
 		"Articles":        articles,
 		"ArticleCount":    articleCount,
@@ -125,6 +144,8 @@ func (s *Server) handleArticleList(w http.ResponseWriter, r *http.Request) {
 		"SearchQuery":     opts.SearchQuery,
 		"DateFrom":        r.URL.Query().Get("date_from"),
 		"DateTo":          r.URL.Query().Get("date_to"),
+		"CurrentTag":      currentTag,
+		"AllTags":         allTags,
 		"HasMore":         hasMore,
 		"NextOffset":      nextOffset,
 		"IsLoadMore":      opts.Offset > 0,
@@ -378,6 +399,8 @@ func (s *Server) renderUpdatedArticleCard(w http.ResponseWriter, id int64) {
 	// 装配标签用于卡片 chips 渲染
 	if tags, err := s.db.GetArticleTags(id); err == nil {
 		articleWithBlog.Tags = tags
+	} else {
+		log.Printf("Error fetching tags for article %d: %v", id, err)
 	}
 
 	data := map[string]interface{}{
