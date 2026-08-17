@@ -807,3 +807,67 @@ func TestMigrationsAddFavoritedAtAndReadAt(t *testing.T) {
 		t.Fatal("expected read_at column to exist")
 	}
 }
+
+func TestScanReadsFavoritedAtAndReadAt(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, err := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("add blog: %v", err)
+	}
+
+	pub := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	inserted, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A", URL: "https://example.com/a", PublishedDate: &pub, HNStatus: model.HNStatusNotSearch},
+	})
+	if err != nil || inserted != 1 {
+		t.Fatalf("add articles: inserted=%d err=%v", inserted, err)
+	}
+
+	all, _ := db.ListArticles(false, nil)
+	id := all[0].ID
+
+	favTime := time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)
+	readTime := time.Date(2026, 3, 3, 0, 0, 0, 0, time.UTC)
+	if _, err := db.conn.Exec(
+		`UPDATE articles SET favorited_at=?, read_at=? WHERE id=?`,
+		favTime.Format(time.RFC3339Nano), readTime.Format(time.RFC3339Nano), id,
+	); err != nil {
+		t.Fatalf("raw set timestamps: %v", err)
+	}
+
+	// scanArticle path (GetArticleByID)
+	a, err := db.GetArticleByID(id)
+	if err != nil || a == nil {
+		t.Fatalf("get by id: %v %v", a, err)
+	}
+	if a.FavoritedAt == nil || !a.FavoritedAt.Equal(favTime) {
+		t.Errorf("GetArticleByID FavoritedAt = %v, want %v", a.FavoritedAt, favTime)
+	}
+	if a.ReadAt == nil || !a.ReadAt.Equal(readTime) {
+		t.Errorf("GetArticleByID ReadAt = %v, want %v", a.ReadAt, readTime)
+	}
+
+	// scanArticleWithBlog path (ListArticlesWithBlog)
+	wb, err := db.ListArticlesWithBlog(false, nil)
+	if err != nil || len(wb) != 1 {
+		t.Fatalf("ListArticlesWithBlog: %v count=%d", err, len(wb))
+	}
+	if wb[0].FavoritedAt == nil || !wb[0].FavoritedAt.Equal(favTime) {
+		t.Errorf("ListArticlesWithBlog FavoritedAt = %v", wb[0].FavoritedAt)
+	}
+
+	// scanArticleWithBlogAndCount path (SearchArticles)
+	isRead := false
+	res, _, err := db.SearchArticles(model.SearchOptions{IsRead: &isRead})
+	if err != nil || len(res) != 1 {
+		t.Fatalf("SearchArticles: %v count=%d", err, len(res))
+	}
+	if res[0].FavoritedAt == nil || !res[0].FavoritedAt.Equal(favTime) {
+		t.Errorf("SearchArticles FavoritedAt = %v", res[0].FavoritedAt)
+	}
+	if res[0].ReadAt == nil || !res[0].ReadAt.Equal(readTime) {
+		t.Errorf("SearchArticles ReadAt = %v", res[0].ReadAt)
+	}
+}
