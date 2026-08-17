@@ -125,7 +125,7 @@
 {{end}}
 {{if .HasMore}}
 <div id="load-more-trigger"
-     hx-get="/articles?filter={{.CurrentFilter}}{{if .CurrentBlogID}}&amp;blog={{.CurrentBlogID}}{{end}}{{if .SearchQuery}}&amp;search={{.SearchQuery}}{{end}}{{if .DateFrom}}&amp;date_from={{.DateFrom}}{{end}}{{if .DateTo}}&amp;date_to={{.DateTo}}{{end}}&amp;offset={{.NextOffset}}"
+     hx-get="/articles?filter={{.CurrentFilter}}{{if .CurrentBlogID}}&amp;blog={{.CurrentBlogID}}{{end}}{{if .SearchQuery}}&amp;search={{.SearchQuery}}{{end}}{{if .DateFrom}}&amp;date_from={{.DateFrom}}{{end}}{{if .DateTo}}&amp;date_to={{.DateTo}}{{end}}{{if .CurrentTag}}&amp;tag={{.CurrentTag}}{{end}}&amp;offset={{.NextOffset}}"
      hx-trigger="intersect once threshold:0.1"
      hx-swap="outerHTML"
      hx-indicator="#loading-indicator">

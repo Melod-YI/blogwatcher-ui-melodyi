@@ -1652,7 +1652,13 @@ func (db *Database) CreateTag(name string) (model.Tag, error) {
 		return *existing, nil
 	}
 	id, _ := result.LastInsertId()
-	tag, _ := db.GetTagByID(id)
+	tag, err := db.GetTagByID(id)
+	if err != nil {
+		return model.Tag{}, fmt.Errorf("query created tag: %w", err)
+	}
+	if tag == nil {
+		return model.Tag{}, errors.New("tag create inconsistent: row vanished")
+	}
 	return *tag, nil
 }
 
