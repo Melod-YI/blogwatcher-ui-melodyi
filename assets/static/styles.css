@@ -2208,6 +2208,8 @@ html.dark {
   color: var(--text-secondary);
 }
 .tag-chip-sm { font-size: 0.7em; padding: 1px 6px; }
+/* .tag-btn 卡片标签按钮，复用 .action-btn 基类，此处仅做语义占位与微调 */
+.tag-btn { position: relative; }
 .tag-chip-remove {
   border: none;
   background: transparent;
