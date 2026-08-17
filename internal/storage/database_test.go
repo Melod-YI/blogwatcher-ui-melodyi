@@ -793,3 +793,122 @@ func TestTagsTablesMigration(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateTag(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	tag, err := db.CreateTag("Go")
+	if err != nil {
+		t.Fatalf("create tag: %v", err)
+	}
+	if tag.Name != "Go" || tag.ID == 0 {
+		t.Fatalf("unexpected tag: %+v", tag)
+	}
+
+	// 重名幂等：返回已存在的标签
+	dup, err := db.CreateTag("Go")
+	if err != nil {
+		t.Fatalf("create duplicate tag: %v", err)
+	}
+	if dup.ID != tag.ID {
+		t.Fatalf("expected same ID for duplicate, got %d vs %d", dup.ID, tag.ID)
+	}
+}
+
+func TestCreateTag_EmptyName(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	if _, err := db.CreateTag(""); err == nil {
+		t.Fatal("expected error for empty tag name")
+	}
+}
+
+func TestGetTagByName(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	created, _ := db.CreateTag("数据库")
+	got, err := db.GetTagByName("数据库")
+	if err != nil || got == nil || got.ID != created.ID {
+		t.Fatalf("get by name: got=%+v err=%v", got, err)
+	}
+	missing, err := db.GetTagByName("不存在")
+	if err != nil || missing != nil {
+		t.Fatalf("expected nil for missing tag, got=%+v err=%v", missing, err)
+	}
+}
+
+func TestListTags_WithCount(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	// 空列表
+	tags, err := db.ListTags()
+	if err != nil {
+		t.Fatalf("list tags: %v", err)
+	}
+	if len(tags) != 0 {
+		t.Fatalf("expected empty, got %d", len(tags))
+	}
+
+	db.CreateTag("Go")
+	db.CreateTag("DB")
+	tags, err = db.ListTags()
+	if err != nil {
+		t.Fatalf("list tags: %v", err)
+	}
+	if len(tags) != 2 {
+		t.Fatalf("expected 2, got %d", len(tags))
+	}
+	// 未绑文章，计数应为 0
+	for _, tg := range tags {
+		if tg.ArticleCount != 0 {
+			t.Fatalf("expected 0 count, got %d for %s", tg.ArticleCount, tg.Name)
+		}
+	}
+}
+
+func TestRenameTag(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	tag, _ := db.CreateTag("old")
+	if err := db.RenameTag(tag.ID, "new"); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+	got, _ := db.GetTagByID(tag.ID)
+	if got.Name != "new" {
+		t.Fatalf("expected name 'new', got %q", got.Name)
+	}
+}
+
+func TestRenameTag_Conflict(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	a, _ := db.CreateTag("a")
+	db.CreateTag("b")
+	if err := db.RenameTag(a.ID, "b"); err == nil {
+		t.Fatal("expected conflict error when renaming to existing name")
+	}
+}
+
+func TestDeleteTag(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	tag, _ := db.CreateTag("solo")
+	affected, err := db.DeleteTag(tag.ID)
+	if err != nil || affected != 0 {
+		t.Fatalf("delete tag: affected=%d err=%v", affected, err)
+	}
+	if got, _ := db.GetTagByID(tag.ID); got != nil {
+		t.Fatal("tag should be deleted")
+	}
+	// 删不存在
+	if _, err := db.DeleteTag(99999); err == nil {
+		t.Fatal("expected error deleting missing tag")
+	}
+}

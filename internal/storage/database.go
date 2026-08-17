@@ -1593,6 +1593,132 @@ func (db *Database) CreateCategory(name string) (model.Category, error) {
 	}, nil
 }
 
+// CreateTag 创建标签，重名幂等：已存在则返回现有标签。
+func (db *Database) CreateTag(name string) (model.Tag, error) {
+	if name == "" {
+		return model.Tag{}, errors.New("tag name cannot be empty")
+	}
+
+	// 先尝试插入
+	result, err := db.conn.Exec(`INSERT INTO tags (name) VALUES (?)`, name)
+	if err != nil {
+		// UNIQUE 冲突 → 回查现有
+		existing, qerr := db.GetTagByName(name)
+		if qerr != nil || existing == nil {
+			return model.Tag{}, err
+		}
+		return *existing, nil
+	}
+	id, _ := result.LastInsertId()
+	tag, _ := db.GetTagByID(id)
+	return *tag, nil
+}
+
+// GetTagByName 按名查标签，不存在返回 (nil, nil)。
+func (db *Database) GetTagByName(name string) (*model.Tag, error) {
+	row := db.conn.QueryRow(`SELECT id, name, created_at FROM tags WHERE name = ?`, name)
+	return scanTag(row)
+}
+
+// GetTagByID 按 ID 查标签，不存在返回 (nil, nil)。
+func (db *Database) GetTagByID(id int64) (*model.Tag, error) {
+	row := db.conn.QueryRow(`SELECT id, name, created_at FROM tags WHERE id = ?`, id)
+	return scanTag(row)
+}
+
+// scanTag 从单行扫描标签。
+func scanTag(row *sql.Row) (*model.Tag, error) {
+	var tag model.Tag
+	var created sql.NullString
+	if err := row.Scan(&tag.ID, &tag.Name, &created); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if created.Valid {
+		if parsed, err := parseTime(created.String); err == nil {
+			tag.CreatedAt = parsed
+		}
+	}
+	return &tag, nil
+}
+
+// ListTags 列出所有标签及关联文章计数，按名称排序。
+func (db *Database) ListTags() ([]model.Tag, error) {
+	rows, err := db.conn.Query(`SELECT t.id, t.name, t.created_at, COUNT(at.article_id) AS cnt
+		FROM tags t
+		LEFT JOIN article_tags at ON at.tag_id = t.id
+		GROUP BY t.id
+		ORDER BY t.name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []model.Tag
+	for rows.Next() {
+		var tag model.Tag
+		var created sql.NullString
+		if err := rows.Scan(&tag.ID, &tag.Name, &created, &tag.ArticleCount); err != nil {
+			return nil, err
+		}
+		if created.Valid {
+			if parsed, err := parseTime(created.String); err == nil {
+				tag.CreatedAt = parsed
+			}
+		}
+		tags = append(tags, tag)
+	}
+	return tags, rows.Err()
+}
+
+// RenameTag 重命名标签。新名与现有标签撞名时返回错误。
+func (db *Database) RenameTag(id int64, newName string) error {
+	if newName == "" {
+		return errors.New("tag name cannot be empty")
+	}
+	result, err := db.conn.Exec(`UPDATE tags SET name = ? WHERE id = ?`, newName, id)
+	if err != nil {
+		return fmt.Errorf("failed to rename tag: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("tag not found: %d", id)
+	}
+	return nil
+}
+
+// DeleteTag 删除标签，事务内先解除所有文章关联再删除标签本身。
+// 返回被删除的关联行数。
+func (db *Database) DeleteTag(id int64) (int64, error) {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`DELETE FROM article_tags WHERE tag_id = ?`, id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to clear tag associations: %w", err)
+	}
+	affected, _ := res.RowsAffected()
+
+	res, err = tx.Exec(`DELETE FROM tags WHERE id = ?`, id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete tag: %w", err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return 0, fmt.Errorf("tag not found: %d", id)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return affected, nil
+}
+
 // ListCategoriesWithBlogCount returns all categories with their blog counts.
 // Uses LEFT JOIN to include categories with zero blogs.
 // Categories are ordered by name alphabetically.
