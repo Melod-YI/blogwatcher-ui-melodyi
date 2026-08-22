@@ -77,9 +77,8 @@ func NewListCmd() *cobra.Command {
   --offset <n>     跳过前 n 条结果（用于翻页）
 
 输出格式：
-  --format table   表格格式（默认）
+  --format tsv     TSV 格式（默认，表头+数据行+补充信息）
   --format json    JSON 格式
-  --format simple  简洁格式
 
 示例：
   blogwatcher article list
@@ -110,7 +109,7 @@ func NewListCmd() *cobra.Command {
 	cmd.Flags().String("after", "", "日期筛选（格式 YYYY-MM-DD）")
 	cmd.Flags().Int("limit", DefaultLimit, fmt.Sprintf("返回结果数量限制（默认 %d，最大 %d，0 表示无限制）", DefaultLimit, MaxLimit))
 	cmd.Flags().Int("offset", 0, "结果偏移量（用于翻页）")
-	cmd.Flags().String("format", "table", "输出格式（table|json|simple）")
+	cmd.Flags().String("format", "tsv", "输出格式（tsv|json）")
 
 	// 标记互斥 flags
 	cmd.MarkFlagsMutuallyExclusive("unread", "read")
@@ -325,10 +324,8 @@ func runList(cmd *cobra.Command, args []string) {
 	switch format {
 	case "json":
 		result = output.FormatJSON(articles, meta)
-	case "simple":
-		result = output.FormatSimple(articles, meta)
 	default:
-		result = output.FormatTable(articles, meta)
+		result = output.FormatTSV(articles, meta)
 	}
 
 	fmt.Println(result)
@@ -583,9 +580,8 @@ func NewGetCmd() *cobra.Command {
 		Long: `按文章 ID 查询单篇文章的完整详情（含博客名、HN 链接、收藏/已读/备注状态等）。
 
 输出格式：
-  --format table   表格格式（默认）
+  --format tsv     TSV 格式（默认，表头+1行+补充信息）
   --format json    JSON 格式（含 url/hn_url/hn_status/has_note/is_favorited 等完整字段）
-  --format simple  简洁格式
 
 示例：
   blogwatcher article get 1
@@ -594,7 +590,7 @@ func NewGetCmd() *cobra.Command {
 		Run:  runGet,
 	}
 
-	cmd.Flags().String("format", "table", "输出格式（table|json|simple）")
+	cmd.Flags().String("format", "tsv", "输出格式（tsv|json）")
 
 	return cmd
 }
@@ -654,10 +650,8 @@ func runGet(cmd *cobra.Command, args []string) {
 	switch format {
 	case "json":
 		result = output.FormatJSON(articles, meta)
-	case "simple":
-		result = output.FormatSimple(articles, meta)
 	default:
-		result = output.FormatTable(articles, meta)
+		result = output.FormatTSV(articles, meta)
 	}
 
 	fmt.Println(result)

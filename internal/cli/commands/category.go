@@ -38,11 +38,11 @@ func NewCategoryListCmd() *cobra.Command {
 		Long: `列出所有分类及其包含的博客数量。
 
 输出格式：
-  --format table   表格格式（默认）
+  --format tsv     TSV 格式（默认，表头+数据行）
   --format json    JSON 格式`,
 		Run: runCategoryList,
 	}
-	cmd.Flags().String("format", "table", "输出格式 (table/json)")
+	cmd.Flags().String("format", "tsv", "输出格式 (tsv|json)")
 	return cmd
 }
 
@@ -72,6 +72,6 @@ func runCategoryList(cmd *cobra.Command, args []string) {
 	case "json":
 		fmt.Println(output.FormatCategoryJSON(categories))
 	default:
-		fmt.Println(output.FormatCategoryTable(categories))
+		fmt.Println(output.FormatCategoryTSV(categories))
 	}
 }

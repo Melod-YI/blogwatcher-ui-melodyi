@@ -7,22 +7,27 @@ import (
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
 )
 
-func TestFormatTagTable(t *testing.T) {
+func TestFormatTagTSV(t *testing.T) {
 	tags := []model.Tag{
 		{ID: 1, Name: "Go", ArticleCount: 3},
 		{ID: 2, Name: "DB", ArticleCount: 0},
 	}
-	out := FormatTagTable(tags)
+	out := FormatTagTSV(tags)
+	// schema 表头
+	if !strings.HasPrefix(out, "id\tname\tarticles") {
+		t.Fatalf("expected tsv header, got:\n%s", out)
+	}
+	// 数据行包含名称与计数
 	if !strings.Contains(out, "Go") || !strings.Contains(out, "DB") {
-		t.Fatalf("expected names in table, got: %s", out)
+		t.Fatalf("expected tag names in tsv, got:\n%s", out)
 	}
 	if !strings.Contains(out, "3") {
-		t.Fatalf("expected article count in table, got: %s", out)
+		t.Fatalf("expected article count in tsv, got:\n%s", out)
 	}
 }
 
-func TestFormatTagTable_Empty(t *testing.T) {
-	out := FormatTagTable(nil)
+func TestFormatTagTSV_Empty(t *testing.T) {
+	out := FormatTagTSV(nil)
 	if !strings.Contains(out, "没有标签") {
 		t.Fatalf("expected empty hint, got: %s", out)
 	}

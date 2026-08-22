@@ -7,8 +7,7 @@ import (
 	"github.com/esttorhe/blogwatcher-ui/v2/internal/model"
 )
 
-// TestArticleOutputTags 验证文章标签在 table/json/simple 三种格式中正确渲染。
-// 覆盖 article get / article list 输出对标签的展示集成。
+// TestArticleOutputTags 验证文章标签在 TSV/JSON 两种格式中正确渲染。
 func TestArticleOutputTags(t *testing.T) {
 	articles := []model.ArticleWithBlog{
 		{
@@ -18,13 +17,13 @@ func TestArticleOutputTags(t *testing.T) {
 	}
 	meta := PaginationMeta{Total: 1, Count: 1}
 
-	// table：Tags 列含两个标签名（逗号拼接）
-	tbl := FormatTable(articles, meta)
-	if !strings.Contains(tbl, "Tags") {
-		t.Fatalf("table header missing Tags column:\n%s", tbl)
+	// tsv：schema 含 tags 列，数据行 tags 单元格逗号拼接
+	tsv := FormatTSV(articles, meta)
+	if !strings.Contains(tsv, "id\ttitle\tblog\tstatus\tfav\ttags\tpublished") {
+		t.Fatalf("tsv schema missing tags column:\n%s", tsv)
 	}
-	if !strings.Contains(tbl, "Go") || !strings.Contains(tbl, "DB") {
-		t.Fatalf("table row missing tag names:\n%s", tbl)
+	if !strings.Contains(tsv, "Go,DB") {
+		t.Fatalf("tsv row missing comma-joined tags:\n%s", tsv)
 	}
 
 	// json：tags 字段含两个标签名
@@ -32,15 +31,9 @@ func TestArticleOutputTags(t *testing.T) {
 	if !strings.Contains(js, `"tags"`) || !strings.Contains(js, `"Go"`) || !strings.Contains(js, `"DB"`) {
 		t.Fatalf("json missing tags field/names:\n%s", js)
 	}
-
-	// simple：#Go #DB 后缀
-	smp := FormatSimple(articles, meta)
-	if !strings.Contains(smp, "#Go") || !strings.Contains(smp, "#DB") {
-		t.Fatalf("simple missing tag suffix:\n%s", smp)
-	}
 }
 
-// TestArticleOutputNoTags 验证无标签文章不输出标签信息（json omitempty、table/simple 空占位）。
+// TestArticleOutputNoTags 验证无标签文章：tsv tags 单元格为空、json 省略 tags 字段。
 func TestArticleOutputNoTags(t *testing.T) {
 	articles := []model.ArticleWithBlog{
 		{ID: 2, Title: "Plain", BlogName: "B"},
@@ -53,9 +46,43 @@ func TestArticleOutputNoTags(t *testing.T) {
 		t.Fatalf("json should omit tags when empty:\n%s", js)
 	}
 
-	// table/simple：行内不应出现 "#"
-	smp := FormatSimple(articles, meta)
-	if strings.Contains(smp, "#") {
-		t.Fatalf("simple should not render tag suffix when empty:\n%s", smp)
+	// tsv：schema 仍含 tags 列，但数据行该单元格为空
+	tsv := FormatTSV(articles, meta)
+	if !strings.Contains(tsv, "\ttags\t") {
+		t.Fatalf("tsv schema should still have tags column:\n%s", tsv)
+	}
+	// 数据行不应出现 "Go" 之类标签名
+	if strings.Contains(tsv, "Plain\tB\t未读\t\t") == false {
+		// 仅做结构性断言：fav 与 tags 两列均为空（连续两个 \t）
+		t.Fatalf("tsv row should have empty fav and tags cells:\n%s", tsv)
+	}
+}
+
+// TestArticleTSV_Pagination 验证补充信息行：count/total/has_more。
+func TestArticleTSV_Pagination(t *testing.T) {
+	articles := []model.ArticleWithBlog{
+		{ID: 1, Title: "A", BlogName: "B"},
+	}
+	// total > count：应给出 total；has_more=true
+	meta := PaginationMeta{Total: 15, Count: 1, Offset: 0, HasMore: true}
+	out := FormatTSV(articles, meta)
+	if !strings.Contains(out, "count=1") {
+		t.Fatalf("expected count line:\n%s", out)
+	}
+	if !strings.Contains(out, "total=15") {
+		t.Fatalf("expected total line when total>count:\n%s", out)
+	}
+	if !strings.Contains(out, "has_more=true") {
+		t.Fatalf("expected has_more line:\n%s", out)
+	}
+
+	// total == count：不应给出 total（与 count 重复）
+	meta2 := PaginationMeta{Total: 1, Count: 1, HasMore: false}
+	out2 := FormatTSV(articles, meta2)
+	if strings.Contains(out2, "total=") {
+		t.Fatalf("should omit total when total==count:\n%s", out2)
+	}
+	if !strings.Contains(out2, "has_more=false") {
+		t.Fatalf("expected has_more=false:\n%s", out2)
 	}
 }

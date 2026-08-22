@@ -192,7 +192,7 @@ func NewBlogListCmd() *cobra.Command {
   --category <name> 按分类名称筛选
 
 输出格式：
-  --format table   表格格式（默认）
+  --format tsv     TSV 格式（默认，表头+数据行）
   --format json    JSON 格式
 
 示例：
@@ -203,7 +203,7 @@ func NewBlogListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().String("category", "", "分类名称筛选")
-	cmd.Flags().String("format", "table", "输出格式 (table/json)")
+	cmd.Flags().String("format", "tsv", "输出格式 (tsv|json)")
 
 	return cmd
 }
@@ -260,6 +260,6 @@ func runBlogList(cmd *cobra.Command, args []string) {
 	case "json":
 		fmt.Println(output.FormatBlogJSON(blogs))
 	default:
-		fmt.Println(output.FormatBlogTable(blogs))
+		fmt.Println(output.FormatBlogTSV(blogs))
 	}
 }
