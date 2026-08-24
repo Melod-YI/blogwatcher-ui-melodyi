@@ -1524,6 +1524,12 @@ func formatTimePtr(value *time.Time) *string {
 	return &formatted
 }
 
+// formatFilterTime 将过滤时间归一为 UTC 秒精度的 RFC3339 字符串（...Z）。
+// 用于 after/before 过滤参数，与存储的 UTC Z 时间做字典序比较。
+func formatFilterTime(value *time.Time) string {
+	return value.UTC().Format("2006-01-02T15:04:05Z")
+}
+
 func interfaceSlice(values []string) []interface{} {
 	result := make([]interface{}, len(values))
 	for i, value := range values {
@@ -1579,7 +1585,8 @@ type ListFilterOptions struct {
 	IsRead        *bool      // 已读状态筛选（nil 表示所有状态）
 	HasNote       *bool      // 备注状态筛选（nil 表示所有状态，false 表示无备注）
 	IsFavorited   *bool      // 收藏状态筛选（nil 表示所有状态）
-	AfterDate     *time.Time // 日期筛选（nil 表示无限制）
+	AfterDate     *time.Time // 起始时间筛选（含），nil 表示无限制
+	BeforeDate    *time.Time // 截止时间筛选（不含），nil 表示无限制
 	SearchQuery   string     // 标题全文搜索关键词（空表示不触发 FTS5）
 	Limit         int        // 结果数量限制（0 表示无限制）
 	Offset        int        // 结果偏移量（用于翻页）
@@ -2212,9 +2219,15 @@ func buildFilterConditions(opts ListFilterOptions) ([]string, []interface{}) {
 	}
 
 	// 日期筛选（使用 published_date 或 discovered_date）
+	// 时间统一归一为 UTC 秒精度 Z 字符串，与存储的 UTC Z（published 无纳秒、discovered 带纳秒）
+	// 做字典序比较，保证精确时间过滤正确。
 	if opts.AfterDate != nil {
 		conditions = append(conditions, "COALESCE(a.published_date, a.discovered_date) >= ?")
-		args = append(args, opts.AfterDate.Format("2006-01-02"))
+		args = append(args, formatFilterTime(opts.AfterDate))
+	}
+	if opts.BeforeDate != nil {
+		conditions = append(conditions, "COALESCE(a.published_date, a.discovered_date) < ?")
+		args = append(args, formatFilterTime(opts.BeforeDate))
 	}
 
 	// 标题全文搜索（FTS5，仅索引 articles_fts 的 title 列）

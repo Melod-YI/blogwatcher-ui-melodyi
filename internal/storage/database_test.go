@@ -1216,6 +1216,56 @@ func TestListArticlesWithFilters_TagFilter(t *testing.T) {
 	}
 }
 
+func TestListArticlesWithFilters_DateRange(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "B", URL: "https://example.com"})
+	// 三篇不同 published_date（UTC），用于验证 after/before 与精确时间边界。
+	old := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	mid := time.Date(2026, 6, 1, 11, 59, 59, 0, time.UTC)
+	new := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "old", URL: "https://example.com/old", PublishedDate: &old, HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "mid", URL: "https://example.com/mid", PublishedDate: &mid, HNStatus: model.HNStatusNotSearch},
+		{BlogID: blog.ID, Title: "new", URL: "https://example.com/new", PublishedDate: &new, HNStatus: model.HNStatusNotSearch},
+	})
+
+	count := func(opts ListFilterOptions) int {
+		t.Helper()
+		res, err := db.ListArticlesWithFilters(opts)
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		return len(res)
+	}
+
+	// after 5月1日：含 mid、new（2）
+	afterMay := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	if got := count(ListFilterOptions{AfterDate: &afterMay, Limit: 100}); got != 2 {
+		t.Fatalf("after May: got %d, want 2", got)
+	}
+	// before 5月1日：仅 old（1）
+	if got := count(ListFilterOptions{BeforeDate: &afterMay, Limit: 100}); got != 1 {
+		t.Fatalf("before May: got %d, want 1", got)
+	}
+	// 区间 [5月1日, 7月1日)：仅 mid（1）
+	beforeJul := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	if got := count(ListFilterOptions{AfterDate: &afterMay, BeforeDate: &beforeJul, Limit: 100}); got != 1 {
+		t.Fatalf("range May-Jul: got %d, want 1", got)
+	}
+	// 精确到秒：before 06-01T12:00:00Z 含 mid（11:59:59 < 12:00:00）→ old+mid（2）
+	preciseCutoff := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	if got := count(ListFilterOptions{BeforeDate: &preciseCutoff, Limit: 100}); got != 2 {
+		t.Fatalf("precise before cutoff: got %d, want 2", got)
+	}
+	// 精确到秒：before 06-01T11:59:59Z 不含 mid（相等取 <，mid 排除）→ 仅 old（1）
+	preciseMid := time.Date(2026, 6, 1, 11, 59, 59, 0, time.UTC)
+	if got := count(ListFilterOptions{BeforeDate: &preciseMid, Limit: 100}); got != 1 {
+		t.Fatalf("precise before mid: got %d, want 1", got)
+	}
+}
+
 func TestSearchArticles_TagFilter(t *testing.T) {
 	db := openTestDB(t)
 	defer db.Close()

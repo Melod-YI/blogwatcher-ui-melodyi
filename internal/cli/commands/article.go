@@ -72,9 +72,19 @@ func NewListCmd() *cobra.Command {
   --favorited      仅显示收藏文章
   --search <kw>    按标题全文搜索（FTS5）
   --tag <name>     按标签名称筛选
-  --after <date>   显示指定日期之后的文章（格式 YYYY-MM-DD）
+  --after <t>      显示该时间之后（含）的文章
+  --before <t>     显示该时间之前（不含）的文章
   --limit <n>      最多返回 n 条结果（默认 20，最大 100，0 表示无限制）
   --offset <n>     跳过前 n 条结果（用于翻页）
+
+时间过滤（--after / --before）接受三种写法：
+  1. 日期          2026-01-01            （该日 UTC 00:00）
+  2. 精确时间      2026-08-10T12:00:00Z  /  2026-08-10T20:00:00+08:00
+                  /  2026-08-10 12:00:00  /  2026-08-10 12:04
+  3. 相对现在      now-24h（24小时前）  now-3d（3天前）  now-2h30m
+                  单位 d/h/m/s 可组合；now 表示此刻（仅过去方向）。
+  语义：--after 为含（>=），--before 为不含（<）。
+        --after 2026-01-01 --before 2026-01-02 = 恰好 1 月 1 日全天。
 
 输出格式：
   --format tsv     TSV 格式（默认，表头+数据行+补充信息）
@@ -88,6 +98,10 @@ func NewListCmd() *cobra.Command {
   blogwatcher article list --noted --unread
   blogwatcher article list --category tech --unread
   blogwatcher article list --blog "Tech Blog" --unread --after 2026-01-01
+  blogwatcher article list --after now-24h                       # 最近24小时
+  blogwatcher article list --before now-7d                        # 7天前及更早
+  blogwatcher article list --after now-2h30m --favorited          # 最近2.5小时的收藏
+  blogwatcher article list --after 2026-08-01 --before 2026-08-10T12:00:00Z  # 精确区间
   blogwatcher article list --unread --limit 10
   blogwatcher article list --limit 20 --offset 20  # 第二页
   blogwatcher article list --search "go"           # 按标题全文搜索
@@ -106,7 +120,8 @@ func NewListCmd() *cobra.Command {
 	cmd.Flags().Bool("favorited", false, "仅收藏文章")
 	cmd.Flags().String("search", "", "标题全文搜索关键词（FTS5）")
 	cmd.Flags().String("tag", "", "标签名称筛选")
-	cmd.Flags().String("after", "", "日期筛选（格式 YYYY-MM-DD）")
+	cmd.Flags().String("after", "", "起始时间筛选（含），支持日期/精确时间/相对现在（now-24h）")
+	cmd.Flags().String("before", "", "截止时间筛选（不含），支持日期/精确时间/相对现在（now-7d）")
 	cmd.Flags().Int("limit", DefaultLimit, fmt.Sprintf("返回结果数量限制（默认 %d，最大 %d，0 表示无限制）", DefaultLimit, MaxLimit))
 	cmd.Flags().Int("offset", 0, "结果偏移量（用于翻页）")
 	cmd.Flags().String("format", "tsv", "输出格式（tsv|json）")
@@ -186,6 +201,7 @@ func runList(cmd *cobra.Command, args []string) {
 	notNoted, _ := cmd.Flags().GetBool("not-noted")
 	search, _ := cmd.Flags().GetString("search")
 	afterStr, _ := cmd.Flags().GetString("after")
+	beforeStr, _ := cmd.Flags().GetString("before")
 	limit, _ := cmd.Flags().GetInt("limit")
 	offset, _ := cmd.Flags().GetInt("offset")
 	format, _ := cmd.Flags().GetString("format")
@@ -258,14 +274,28 @@ func runList(cmd *cobra.Command, args []string) {
 		opts.TagName = tagName
 	}
 
-	// 解析日期筛选
+	// 解析时间筛选（--after / --before）
+	now := time.Now()
 	if afterStr != "" {
-		afterDate, err := time.Parse("2006-01-02", afterStr)
+		afterDate, err := parseTimeFilter(afterStr, now)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "日期格式错误: %v（格式应为 YYYY-MM-DD）\n", err)
+			fmt.Fprintf(os.Stderr, "--after 参数错误: %v\n", err)
 			os.Exit(1)
 		}
 		opts.AfterDate = &afterDate
+	}
+	if beforeStr != "" {
+		beforeDate, err := parseTimeFilter(beforeStr, now)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "--before 参数错误: %v\n", err)
+			os.Exit(1)
+		}
+		opts.BeforeDate = &beforeDate
+	}
+	// after 不能晚于 before（否则结果恒空，提示避免困惑）
+	if opts.AfterDate != nil && opts.BeforeDate != nil && opts.AfterDate.After(*opts.BeforeDate) {
+		fmt.Fprintf(os.Stderr, "--after 不能晚于 --before\n")
+		os.Exit(1)
 	}
 
 	// 查询文章
