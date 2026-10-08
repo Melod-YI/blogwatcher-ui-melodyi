@@ -592,7 +592,7 @@ func runUnfavorite(cmd *cobra.Command, args []string) {
 	}
 
 	// 取消收藏文章
-	err = db.UnfavoriteArticle(id)
+	err = db.UnfavoriteArticle(id, model.UnfavoriteSourceCLI)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "取消收藏文章失败: %v\n", err)
 		os.Exit(1)

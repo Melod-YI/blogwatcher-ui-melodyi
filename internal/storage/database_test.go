@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -816,7 +817,7 @@ func TestFavoriteArticle(t *testing.T) {
 	}
 
 	// Unfavorite the article
-	if err := db.UnfavoriteArticle(articleID); err != nil {
+	if err := db.UnfavoriteArticle(articleID, model.UnfavoriteSourceCLI); err != nil {
 		t.Fatalf("unfavorite article: %v", err)
 	}
 
@@ -839,7 +840,7 @@ func TestFavoriteArticleNotFound(t *testing.T) {
 		t.Fatal("expected error for non-existent article")
 	}
 
-	err = db.UnfavoriteArticle(99999)
+	err = db.UnfavoriteArticle(99999, model.UnfavoriteSourceCLI)
 	if err == nil {
 		t.Fatal("expected error for non-existent article")
 	}
@@ -1403,7 +1404,7 @@ func TestFavoriteArticleSetsFavoritedAt(t *testing.T) {
 		t.Fatal("expected favorited_at to be set after favorite")
 	}
 
-	if err := db.UnfavoriteArticle(id); err != nil {
+	if err := db.UnfavoriteArticle(id, model.UnfavoriteSourceCLI); err != nil {
 		t.Fatalf("unfavorite: %v", err)
 	}
 	a, _ = db.GetArticleByID(id)
@@ -1412,6 +1413,75 @@ func TestFavoriteArticleSetsFavoritedAt(t *testing.T) {
 	}
 	if a.IsFavorited {
 		t.Fatal("expected is_favorited=false after unfavorite")
+	}
+}
+
+// unfavoriteColumns 直接读取新增的 unfavorite 追踪列，供测试断言。
+func unfavoriteColumns(t *testing.T, db *Database, id int64) (unfavoritedAt, unfavoriteSource sql.NullString) {
+	t.Helper()
+	err := db.conn.QueryRow(
+		`SELECT unfavorited_at, unfavorite_source FROM articles WHERE id = ?`, id,
+	).Scan(&unfavoritedAt, &unfavoriteSource)
+	if err != nil {
+		t.Fatalf("query unfavorite columns: %v", err)
+	}
+	return
+}
+
+func TestUnfavoriteArticleRecordsEventAndSource(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	blog, _ := db.AddBlog(model.Blog{Name: "T", URL: "https://example.com"})
+	if _, _, err := db.AddArticlesBulk([]model.Article{
+		{BlogID: blog.ID, Title: "A", URL: "https://example.com/a", HNStatus: model.HNStatusNotSearch},
+	}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	all, _ := db.ListArticles(false, nil)
+	id := all[0].ID
+
+	// 收藏后取消（来源 cli）——应写入 unfavorited_at + source，并清空 favorited_at
+	if err := db.FavoriteArticle(id); err != nil {
+		t.Fatalf("favorite: %v", err)
+	}
+	if err := db.UnfavoriteArticle(id, model.UnfavoriteSourceCLI); err != nil {
+		t.Fatalf("unfavorite: %v", err)
+	}
+	unfavAt, src := unfavoriteColumns(t, db, id)
+	if !unfavAt.Valid {
+		t.Fatal("expected unfavorited_at to be set after unfavorite")
+	}
+	if src.String != model.UnfavoriteSourceCLI {
+		t.Fatalf("expected unfavorite_source=%q, got %q", model.UnfavoriteSourceCLI, src.String)
+	}
+	a, _ := db.GetArticleByID(id)
+	if a.FavoritedAt != nil {
+		t.Fatalf("expected favorited_at to be nil after unfavorite, got %v", a.FavoritedAt)
+	}
+	if a.IsFavorited {
+		t.Fatal("expected is_favorited=false after unfavorite")
+	}
+
+	// 重新收藏——应清空 unfavorited_at 与 unfavorite_source，避免陈旧脏值
+	if err := db.FavoriteArticle(id); err != nil {
+		t.Fatalf("re-favorite: %v", err)
+	}
+	unfavAt, src = unfavoriteColumns(t, db, id)
+	if unfavAt.Valid {
+		t.Fatalf("expected unfavorited_at to be nil after re-favorite, got %s", unfavAt.String)
+	}
+	if src.Valid {
+		t.Fatalf("expected unfavorite_source to be nil after re-favorite, got %s", src.String)
+	}
+
+	// 再次取消（来源 webui）——应覆盖为最新来源
+	if err := db.UnfavoriteArticle(id, model.UnfavoriteSourceWebUI); err != nil {
+		t.Fatalf("unfavorite again: %v", err)
+	}
+	_, src = unfavoriteColumns(t, db, id)
+	if src.String != model.UnfavoriteSourceWebUI {
+		t.Fatalf("expected unfavorite_source=%q, got %q", model.UnfavoriteSourceWebUI, src.String)
 	}
 }
 

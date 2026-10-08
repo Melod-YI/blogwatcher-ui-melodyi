@@ -349,7 +349,7 @@ func (s *Server) handleUnfavorite(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("handleUnfavorite: unfavoriting article %d", id)
 
-	if err := s.db.UnfavoriteArticle(id); err != nil {
+	if err := s.db.UnfavoriteArticle(id, model.UnfavoriteSourceWebUI); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			http.Error(w, "Article not found", http.StatusNotFound)
 			return

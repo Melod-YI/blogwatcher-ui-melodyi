@@ -247,6 +247,20 @@ func (db *Database) ensureMigrations() error {
 		}
 	}
 
+	// Add unfavorited_at column if it doesn't exist — 记录最后一次取消收藏时间
+	if !db.columnExists("articles", "unfavorited_at") {
+		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN unfavorited_at TIMESTAMP`); err != nil {
+			return fmt.Errorf("failed to add unfavorited_at column: %w", err)
+		}
+	}
+
+	// Add unfavorite_source column if it doesn't exist — 记录取消收藏来源(cli/webui)
+	if !db.columnExists("articles", "unfavorite_source") {
+		if _, err := db.conn.Exec(`ALTER TABLE articles ADD COLUMN unfavorite_source TEXT`); err != nil {
+			return fmt.Errorf("failed to add unfavorite_source column: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -875,7 +889,7 @@ func (db *Database) UpdateArticleHasNote(id int64, hasNote bool) error {
 func (db *Database) FavoriteArticle(id int64) error {
 	now := time.Now().Format(sqliteTimeLayout)
 	log.Printf("[Storage] FavoriteArticle: id=%d time=%s", id, now)
-	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 1, favorited_at = ? WHERE id = ?`, now, id)
+	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 1, favorited_at = ?, unfavorited_at = NULL, unfavorite_source = NULL WHERE id = ?`, now, id)
 	if err != nil {
 		return fmt.Errorf("failed to favorite article: %w", err)
 	}
@@ -889,11 +903,13 @@ func (db *Database) FavoriteArticle(id int64) error {
 	return nil
 }
 
-// UnfavoriteArticle removes the favorite mark from an article.
-// Returns error if the article does not exist.
-func (db *Database) UnfavoriteArticle(id int64) error {
-	log.Printf("[Storage] UnfavoriteArticle: id=%d", id)
-	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 0, favorited_at = NULL WHERE id = ?`, id)
+// UnfavoriteArticle removes the favorite mark from an article and records the
+// unfavorite event (unfavorited_at + unfavorite_source). source 标记来源，取值见
+// model.UnfavoriteSource* 常量。Returns error if the article does not exist.
+func (db *Database) UnfavoriteArticle(id int64, source string) error {
+	now := time.Now().Format(sqliteTimeLayout)
+	log.Printf("[Storage] UnfavoriteArticle: id=%d source=%s time=%s", id, source, now)
+	result, err := db.conn.Exec(`UPDATE articles SET is_favorited = 0, favorited_at = NULL, unfavorited_at = ?, unfavorite_source = ? WHERE id = ?`, now, source, id)
 	if err != nil {
 		return fmt.Errorf("failed to unfavorite article: %w", err)
 	}

@@ -103,3 +103,9 @@ const (
 	SortFavorited = "favorited"
 	SortRead      = "read"
 )
+
+// UnfavoriteSource 取值常量 — 取消收藏动作的来源标记
+const (
+	UnfavoriteSourceCLI   = "cli"
+	UnfavoriteSourceWebUI = "webui"
+)
