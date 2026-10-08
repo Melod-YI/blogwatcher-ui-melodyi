@@ -7,10 +7,43 @@ import (
 )
 
 func TestBaseProcessor_NormalizeArticleURL(t *testing.T) {
-	p := BaseProcessor{}
-	url := "https://example.com/article/1"
-	if got := p.NormalizeArticleURL(url); got != url {
-		t.Errorf("BaseProcessor.NormalizeArticleURL(%s) = %s, want %s", url, got, url)
+	// 尾斜杠归一化是全局默认行为：不同 feed（HN 官方 RSS、RSSHub 路由、博客官方
+	// RSS）对同一篇文章可能给出带/不带尾斜杠两种 URL，而文章查重按 URL 精确匹配，
+	// 必须统一归一为无尾斜杠的规范形式，否则跨 feed 重复收录（2026-10 bug）。
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{
+			name: "无尾斜杠保持不变",
+			url:  "https://example.com/article/1",
+			want: "https://example.com/article/1",
+		},
+		{
+			name: "尾斜杠被去除",
+			url:  "https://example.com/article/1/",
+			want: "https://example.com/article/1",
+		},
+		{
+			name: "纯域名带斜杠被去除",
+			url:  "https://example.com/",
+			want: "https://example.com",
+		},
+		{
+			name: "纯域名无斜杠保持不变",
+			url:  "https://example.com",
+			want: "https://example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := BaseProcessor{}
+			if got := p.NormalizeArticleURL(tt.url); got != tt.want {
+				t.Errorf("BaseProcessor.NormalizeArticleURL(%s) = %s, want %s", tt.url, got, tt.want)
+			}
+		})
 	}
 }
 

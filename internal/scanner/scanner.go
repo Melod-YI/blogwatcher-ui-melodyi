@@ -95,7 +95,7 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 				stubs = append(stubs, articleStub{
 					BlogID:        blog.ID,
 					Title:         a.Title,
-					URL:           a.URL,
+					URL:           proc.NormalizeArticleURL(a.URL),
 					PublishedDate: a.PublishedDate,
 				})
 			}

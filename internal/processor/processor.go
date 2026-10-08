@@ -7,7 +7,10 @@ import "strings"
 // BlogProcessor 定义博客级的自定义处理钩子
 // 各环节的默认实现不做任何转换，博客按需重写
 type BlogProcessor interface {
-	// NormalizeArticleURL 清洗 RSS 解析出的文章 URL
+	// NormalizeArticleURL 清洗 RSS 解析出的文章 URL。
+	// 默认实现统一去除末尾斜杠：不同来源（HN 官方 RSS、RSSHub 路由、博客官方 feed）
+	// 对同一篇文章可能给出带/不带尾斜杠两种 URL，而文章查重按 URL 精确匹配，
+	// 必须归一为无尾斜杠的规范形式，否则跨 feed 会重复收录。
 	NormalizeArticleURL(articleURL string) string
 
 	// NormalizeSearchURL 清洗 HN 搜索前使用的 URL
@@ -20,11 +23,12 @@ type BlogProcessor interface {
 	ShouldSkipArticle(title string) bool
 }
 
-// BaseProcessor 默认实现，所有方法原样返回输入值
+// BaseProcessor 默认实现，各方法原样返回输入值（NormalizeArticleURL 除外，
+// 它统一去除 URL 末尾斜杠以保证跨 feed 查重一致）
 // 博客处理器可嵌入此结构体，仅重写需要的方法
 type BaseProcessor struct{}
 
-func (BaseProcessor) NormalizeArticleURL(articleURL string) string      { return articleURL }
+func (BaseProcessor) NormalizeArticleURL(articleURL string) string      { return strings.TrimRight(articleURL, "/") }
 func (BaseProcessor) NormalizeSearchURL(searchURL string) string        { return searchURL }
 func (BaseProcessor) NormalizeThumbnailURL(thumbnailURL string) string  { return thumbnailURL }
 func (BaseProcessor) ShouldSkipArticle(title string) bool               { return false }

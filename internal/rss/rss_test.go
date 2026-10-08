@@ -3,7 +3,12 @@
 package rss
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/esttorhe/blogwatcher-ui/v2/internal/processor"
 )
 
 func TestExtractHNURLFromComments(t *testing.T) {
@@ -91,5 +96,38 @@ func TestExtractHNURLFromDescription(t *testing.T) {
 					tt.description, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestParseFeed_TrimsTrailingSlashFromArticleURL 回归测试：跨 feed 重复收录 bug。
+// HN 官方 RSS / RSSHub 路由等聚合 feed 给出的文章 URL 带尾斜杠，而原博客 feed
+// 已按无斜杠形式收录。文章查重按 URL 精确匹配，若聚合 feed 的 URL 不做归一化，
+// 同一篇文章会重复入库（如 simonwillison.net 文章在 Simon 博客与 Hackernews News
+// 两条博客下各存一条）。
+func TestParseFeed_TrimsTrailingSlashFromArticleURL(t *testing.T) {
+	rssXML := `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+<title>Aggregate Feed</title>
+<item><title>Post with slash</title><link>https://example.com/post/</link></item>
+<item><title>Post without slash</title><link>https://example.com/post</link></item>
+</channel></rss>`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		_, _ = w.Write([]byte(rssXML))
+	}))
+	defer srv.Close()
+
+	articles, err := ParseFeed(context.Background(), srv.URL, processor.BaseProcessor{})
+	if err != nil {
+		t.Fatalf("ParseFeed() error = %v", err)
+	}
+	if len(articles) != 2 {
+		t.Fatalf("ParseFeed() returned %d articles, want 2", len(articles))
+	}
+	for _, a := range articles {
+		if a.URL != "https://example.com/post" {
+			t.Errorf("article %q URL = %s, want https://example.com/post", a.Title, a.URL)
+		}
 	}
 }
