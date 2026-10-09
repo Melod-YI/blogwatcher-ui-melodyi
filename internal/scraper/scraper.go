@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -58,8 +59,15 @@ func ScrapeBlog(ctx context.Context, blogURL string, selector string) ([]Scraped
 
 	doc.Find(selector).Each(func(_ int, selection *goquery.Selection) {
 		link := selection
+		descendant := false // 选择器匹配的是 <a> 的后代元素（如整卡链接内的标题标签）
 		if goquery.NodeName(selection) != "a" {
 			link = selection.Find("a").First()
+			if link.Length() == 0 {
+				// 向下找不到 <a> 时向上取最近的祖先 <a>（场景：整卡即 <a>，
+				// 选择器匹配卡片内的标题元素，如 "a[href^='...'] h3"）
+				link = selection.Closest("a")
+				descendant = true
+			}
 		}
 		if link.Length() == 0 {
 			return
@@ -77,17 +85,64 @@ func ScrapeBlog(ctx context.Context, blogURL string, selector string) ([]Scraped
 		}
 		seen[resolved] = struct{}{}
 
-		title := extractTitle(link, selection)
+		var title string
+		if descendant {
+			// 匹配元素即标题载体，直接取其文本，避免整卡文本（日期/摘要）混入
+			title = strings.TrimSpace(selection.Text())
+			if title == "" {
+				title = extractTitle(link, selection)
+			}
+		} else {
+			title = extractTitle(link, selection)
+		}
 		if title == "" {
 			return
 		}
 		articles = append(articles, ScrapedArticle{
-			Title: title,
-			URL:   resolved,
+			Title:         title,
+			URL:           resolved,
+			PublishedDate: extractPublishedDate(link),
 		})
 	})
 
 	return articles, nil
+}
+
+// cardDateLayouts 卡片内日期串的常见格式（完整日期，避免误匹配年份等碎片）
+var cardDateLayouts = []string{
+	time.RFC3339,
+	"January 2, 2006", // October 6, 2026
+	"Jan 2, 2006",     // Oct 1, 2026
+	"2006-01-02",      // 2026-10-06
+}
+
+// cardDateRe 匹配卡片文本中的完整日期串：月名+日+年（全名/缩写）或 ISO 日期
+var cardDateRe = regexp.MustCompile(`(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2}`)
+
+// extractPublishedDate 从卡片（链接元素）内提取发布日期：
+// 优先 HTML 标准的 <time datetime="...">，回退到卡片文本中的第一个完整日期串。
+// 提取不到返回 nil，由调用方决定兜底（如以发现时间代替）。
+func extractPublishedDate(link *goquery.Selection) *time.Time {
+	if dt, ok := link.Find("time").First().Attr("datetime"); ok && dt != "" {
+		if t := parseCardDate(dt); t != nil {
+			return t
+		}
+	}
+	if m := cardDateRe.FindString(link.Text()); m != "" {
+		return parseCardDate(m)
+	}
+	return nil
+}
+
+// parseCardDate 按已知 layout 解析日期串，全部失败返回 nil
+func parseCardDate(s string) *time.Time {
+	s = strings.TrimSpace(strings.Replace(s, "Sept ", "Sep ", 1)) // 非标准缩写归一
+	for _, layout := range cardDateLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return &t
+		}
+	}
+	return nil
 }
 
 func extractTitle(link *goquery.Selection, parent *goquery.Selection) string {

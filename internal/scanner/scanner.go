@@ -149,6 +149,14 @@ func ScanBlog(ctx context.Context, db *storage.Database, blog model.Blog) ScanRe
 		newStubs = append(newStubs, stub)
 	}
 
+	// 无法得知发布时间的文章（feed 无日期 / scraper 未提取到日期），
+	// 以发现时间作为 published_date，避免空值
+	for i := range newStubs {
+		if newStubs[i].PublishedDate == nil {
+			newStubs[i].PublishedDate = &discoveredAt
+		}
+	}
+
 	// Phase 4: Only for genuinely new articles, fetch OG thumbnails if needed
 	// 同时记录 RSS 直提的 HN 链接
 	hnFromRSS := 0

@@ -99,6 +99,15 @@ $env:BLOGWATCHER_FEED_HOSTMAP="rsshub:1200=localhost:19998"
 
 compose 中 rsshub 已设置 `NO_RANDOM_UA: 'true'`（使用 `RSSHub/1.0 ...` bot UA 而非默认的 Chrome 浏览器 UA）。**不要移除该配置**：HN 会做 UA 与 TLS 指纹一致性检测——RSSHub 默认伪装 Chrome UA 但 TLS 栈是 Node 的，HN 判定为伪装爬虫返回 419，导致 `/hackernews/best` 等路由 503（2026-10 实测）。诚实 UA（无 UA / `Go-http-client` / bot 标识）放行。浏览器 UA 仅在请求实际走 puppeteer（真实浏览器 TLS 指纹）时才可安全使用。
 
+### Claude Blog 走 scraper 兜底
+
+claude.com 2026-10 改版：`/blog` 308 重定向到 `/resources/articles`，页面从固定 class 的 SSR 结构（`.blog_cms_list`）变为 CSS-module 哈希类名的 React 页面，RSSHub `claude/blog` 路由选择器失效返回 route is empty（上游 master 尚未适配）。应对：
+
+- 该博客已配置 `scrape_selector = 'a[href^="/resources/articles/"] h3'`，scanner 在 feed 无产出时自动回退 scraper 抓取页面（`FeedURL` 保留，RSSHub 上游修复后自动切回 feed，含日期与详情内容的质量更高）。
+- scraper 支持"选择器匹配 `<a>` 后代元素"模式：向下找不到 `<a>` 时 `Closest("a")` 向上取链接，标题取匹配元素自身文本（避免整卡文本混入）。
+- scraper 自动提取卡片内发布日期：优先 `<time datetime="...">`（HTML 标准），回退卡片文本中的完整日期串（`Oct 1, 2026` / `October 6, 2026` / `2026-10-06`）；scanner 层对仍无日期的文章以发现时间填入 `published_date`，保证非空。
+- **新旧 URL 路径不同**（`/blog/<slug>` vs `/resources/articles/<slug>`）：同一篇文章在改版窗口期会以两种 URL 各入库一次。处理原则：**保留新 URL 形式**（未来扫描只产出新形式，保留旧形式会无限再重复），旧记录状态聚合后删除（2026-10-08 已合并 3 组）。
+
 ### simonwillison.net 处理
 
 **URL 清洗**：simonwillison.net 的所有 atom feed（everything、notes、links 等）中的文章链接包含 `/#atom-xxx` 后缀（如 `/#atom-everything`、`/#atom-notes`、`/#atom-blogmarks`），这会导致 HN 搜索功能无法正确匹配。RSS 解析时会自动匹配 feed URL 以 `simonwillison.net/atom` 开头的博客并去除该后缀，无需手动处理。
