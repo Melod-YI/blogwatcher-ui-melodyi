@@ -95,6 +95,10 @@ $env:BLOGWATCHER_FEED_HOSTMAP="rsshub:1200=localhost:19998"
 
 注意：走 rsshub 的博客应直接填好 FeedURL，不要依赖 `DiscoverFeedURL` 自动发现——自动发现返回的地址会被写回 DB，重写会导致 `localhost` 形式落库而破坏一致性。
 
+### rsshub 容器必须使用诚实 UA（NO_RANDOM_UA）
+
+compose 中 rsshub 已设置 `NO_RANDOM_UA: 'true'`（使用 `RSSHub/1.0 ...` bot UA 而非默认的 Chrome 浏览器 UA）。**不要移除该配置**：HN 会做 UA 与 TLS 指纹一致性检测——RSSHub 默认伪装 Chrome UA 但 TLS 栈是 Node 的，HN 判定为伪装爬虫返回 419，导致 `/hackernews/best` 等路由 503（2026-10 实测）。诚实 UA（无 UA / `Go-http-client` / bot 标识）放行。浏览器 UA 仅在请求实际走 puppeteer（真实浏览器 TLS 指纹）时才可安全使用。
+
 ### simonwillison.net 处理
 
 **URL 清洗**：simonwillison.net 的所有 atom feed（everything、notes、links 等）中的文章链接包含 `/#atom-xxx` 后缀（如 `/#atom-everything`、`/#atom-notes`、`/#atom-blogmarks`），这会导致 HN 搜索功能无法正确匹配。RSS 解析时会自动匹配 feed URL 以 `simonwillison.net/atom` 开头的博客并去除该后缀，无需手动处理。

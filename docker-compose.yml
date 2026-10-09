@@ -26,6 +26,10 @@ services:
       - '19998:1200'
     environment:
       NODE_ENV: production
+      # 使用诚实 bot UA（RSSHub/1.0 ...）而非默认的 Chrome 浏览器 UA。
+      # HN 会做 UA 与 TLS 指纹一致性检测：浏览器 UA + Node TLS 指纹 = 伪装爬虫 → 419，
+      # 诚实 UA 放行。浏览器 UA 仅应在走 puppeteer（真实浏览器指纹）时使用。
+      NO_RANDOM_UA: 'true'
       CACHE_TYPE: redis
       REDIS_URL: 'redis://redis:6379/'
       PUPPETEER_WS_ENDPOINT: 'ws://browserless:3000' # marked
